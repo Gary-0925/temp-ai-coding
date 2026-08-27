@@ -127,7 +127,7 @@ $GENERALS_CONFIG = [
         'avatar' => '/upload/lolmtoj/1.png',
         'skills' => [
             ['name' => '信心', 'type' => '锁定技', 'desc' => '准备阶段，若你拥有“信心”标记，你必须指定一名其他角色并将标记转移给该角色，该角色受到一点伤害；否则你获得“信心”标记，并恢复一点体力。'],
-            ['name' => '泄密', 'type' => '出牌技', 'desc' => '锁定技，出牌阶段，若你拥有手牌，你必须指定一个拥有“信心”标记最多的角色，该角色获得你一张手牌。']
+            ['name' => '泄密', 'type' => '出牌技', 'desc' => '锁定技，出牌阶段限一次，若你拥有手牌，你必须指定一个拥有“信心”标记最多的角色，该角色获得你一张手牌。']
         ]
     ],
     2 => [
@@ -148,7 +148,7 @@ $GENERALS_CONFIG = [
         'avatar' => '/upload/lolmtoj/3.png',
         'skills' => [
             ['name' => '瑞平', 'type' => '出牌技', 'desc' => '出牌阶段限一次，你可以指定一名角色，若该角色已有“瑞平”标记，其弃置两张手牌；否则其获得一个“瑞平”标记。'],
-            ['name' => '制牌', 'type' => '出牌技', 'desc' => '你可以指定一名有至少两个“瑞平”标记的角色并使用lycuim制牌，其失去所有瑞平标记，你将该角色所有手牌任意排列后将若干张（可为零）插入到牌堆顶，并获得其余牌。随后若你还未翻面，你翻面。']
+            ['name' => '制牌', 'type' => '出牌技', 'desc' => '你可以指定一名拥有“瑞平”标记的角色并使用lycuim制牌，其失去所有瑞平标记，你将该角色所有手牌任意排列后将若干张（可为零）插入到牌堆顶，并获得其余牌。随后若你还未翻面，你翻面。']
         ]
     ],
     4 => [
@@ -420,6 +420,7 @@ function applyDamage(&$state, &$target, $damage, $sourceUid, $sourceName)
 function nextTurn(&$state)
 {
     if (checkGameOver($state)) return;
+    $state['no_tiaojiao_extra'] = false;
     $count = count($state['players']);
     $tries = 0;
     do {
@@ -444,7 +445,8 @@ function nextTurn(&$state)
             $curr['marks']['xiaomaoliang'] = 0;
             $state['turn_index'] = $raboIdx;
             $curr = &$state['players'][$state['turn_index']];
-            addLog($state, "<span style='color:#9b59b6;font-weight:bold;'>【控制】</span> <strong>{$origName}</strong> 拥有 2 个“小猫梁”标记，回合被替换为 <strong>{$curr['name']}</strong> 的回合！");
+            $state['no_tiaojiao_extra'] = true;
+            addLog($state, "<span style='color:#9b59b6;font-weight:bold;'>【控制】</span> <strong>{$origName}</strong> 拥有 2 个“小猫梁”标记，回合被替换为 <strong>{$curr['name']}</strong> 的回合！（该回合内无法使用【调教】）");
         }
     }
 
@@ -457,8 +459,6 @@ function nextTurn(&$state)
     }
     $state['used_sha_this_turn'] = false;
     $state['used_ruiping'] = false;
-    $state['used_zhipai'] = false;
-    $state['used_rende'] = false;
     $state['used_sajiao'] = false;
     $state['used_tiaojiao'] = false;
     $state['pending_response'] = null;
@@ -496,7 +496,7 @@ function nextTurn(&$state)
     if ($curr['general']['name'] === 'Ydch' && !$curr['dead']) {
         if ($curr['marks']['xinxin'] > 0) {
             $state['phase'] = 'JIJIANG_SELECT';
-            addLog($state, "<span style='color:#3498db;font-weight:bold;'>【激将】</span> 必须指定一名其他角色转移“信心”标记并对其造成1点伤害");
+            addLog($state, "<span style='color:#3498db;font-weight:bold;'>【信心】</span> 必须指定一名其他角色转移“信心”标记并对其造成1点伤害");
             return;
         } else {
             $curr['marks']['xinxin'] += 1;
@@ -514,6 +514,35 @@ function startDrawAndPlayPhase(&$state)
     $curr['hand'] = array_merge($curr['hand'], $drawn);
     addLog($state, "<strong>{$curr['name']}</strong> 摸了 2 张牌");
     $state['phase'] = 'PLAY';
+
+    // Ydch【泄密】锁定技：出牌阶段限一次，若有手牌，必须将一张手牌交给“信心”标记最多的角色
+    if ($curr['general']['name'] === 'Ydch' && !$curr['dead'] && count($curr['hand']) > 0) {
+        $maxM = 0;
+        foreach ($state['players'] as $p) {
+            if (!$p['dead'] && (int)$p['marks']['xinxin'] > $maxM) $maxM = (int)$p['marks']['xinxin'];
+        }
+        if ($maxM > 0) {
+            $bestIdx = -1;
+            foreach ($state['players'] as $idx => $p) {
+                if (!$p['dead'] && (int)$p['marks']['xinxin'] === $maxM && $p['uid'] !== $curr['uid']) {
+                    $bestIdx = $idx;
+                    break;
+                }
+            }
+            if ($bestIdx !== -1) {
+                $best = &$state['players'][$bestIdx];
+                addLog($state, "<span style='color:#f39c12;font-weight:bold;'>【泄密】</span> <strong>{$curr['name']}</strong> 拥有手牌，必须将一张手牌交给“信心”标记最多（{$maxM}）的 <strong>{$best['name']}</strong>！");
+                $state['pending_response'] = [
+                    'type' => 'xiemi_give',
+                    'actor_name' => $curr['name'],
+                    'target_uid' => $best['uid'],
+                    'target_name' => $best['name']
+                ];
+            } else {
+                addLog($state, "<span style='color:#f39c12;font-weight:bold;'>【泄密】</span> “信心”标记最多的是 <strong>{$curr['name']}</strong> 自己，无效果。");
+            }
+        }
+    }
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
@@ -681,8 +710,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
             'turn_index' => 0,
             'used_sha_this_turn' => false,
             'used_ruiping' => false,
-            'used_zhipai' => false,
-            'used_rende' => false,
             'used_sajiao' => false,
             'used_tiaojiao' => false,
             'used_guanshui' => false,
@@ -796,6 +823,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
         while ($p = $playersRes->fetch_assoc()) {
             if ($p['uid'] == $login_uid) $isPlayer = true;
             $roomPlayers[] = $p;
+        }
+
+        // 【灌水】/【制牌】选牌期间，仅向发动者本人下发暗牌视图（不落库，仅本次响应可见）
+        if (!empty($gameState['pending_response'])
+            && in_array($gameState['pending_response']['type'], ['guanshui_select', 'zhipai_arrange'], true)
+            && (int) $gameState['pending_response']['from_uid'] === $login_uid) {
+            $prType = $gameState['pending_response']['type'];
+            $pool = [];
+            if ($prType === 'guanshui_select') {
+                foreach ($gameState['players'] as $gp) {
+                    if (!$gp['dead'] && (int) $gp['uid'] !== $login_uid) {
+                        foreach ($gp['hand'] as $c) {
+                            $pool[] = ['cid' => $c['cid'], 'name' => $c['name'], 'suit' => $c['suit'], 'num' => $c['num'], 'color' => $c['color'], 'type' => $c['type'], 'owner_name' => $gp['name']];
+                        }
+                    }
+                }
+            } else {
+                $ztIdx = getPlayerIndexByUid($gameState, $gameState['pending_response']['target_uid']);
+                if ($ztIdx !== -1) {
+                    foreach ($gameState['players'][$ztIdx]['hand'] as $c) {
+                        $pool[] = ['cid' => $c['cid'], 'name' => $c['name'], 'suit' => $c['suit'], 'num' => $c['num'], 'color' => $c['color'], 'type' => $c['type'], 'owner_name' => $gameState['players'][$ztIdx]['name']];
+                    }
+                }
+            }
+            $gameState['pending_response']['pool_view'] = $pool;
         }
 
         if (!empty($gameState['players'])) {
@@ -1040,19 +1092,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
                 $myIdx = getPlayerIndexByUid($state, $login_uid);
                 $useCard = (bool) ($_POST['use_card'] ?? false);
                 if ($useCard) {
-                    if ($myIdx !== -1 && isset($state['players'][$myIdx]['hand'][$cardIdx]) && in_array($state['players'][$myIdx]['hand'][$cardIdx]['name'], ['杀', '闪'])) {
-                        $card = array_splice($state['players'][$myIdx]['hand'], $cardIdx, 1)[0];
-                        $state['discard'][] = $card;
-                        addLog($state, "<strong>{$state['players'][$myIdx]['name']}</strong> 弃置了一张【{$card['name']}】");
-                        advanceAoeQueue($state);
-                    } else {
-                        echo json_encode(['success' => false, 'msg' => '请选择手牌中的【杀】或【闪】']);
+                    $indices = json_decode($_POST['card_indices'] ?? '[]', true);
+                    if (!is_array($indices)) $indices = [];
+                    $indices = array_values(array_unique(array_map('intval', $indices)));
+                    $valid = (count($indices) === 2);
+                    foreach ($indices as $idx) {
+                        if ($myIdx === -1 || !isset($state['players'][$myIdx]['hand'][$idx])) $valid = false;
+                    }
+                    if (!$valid) {
+                        echo json_encode(['success' => false, 'msg' => '请选择 2 张手牌弃置']);
                         exit;
                     }
+                    rsort($indices);
+                    foreach ($indices as $idx) {
+                        $state['discard'][] = array_splice($state['players'][$myIdx]['hand'], $idx, 1)[0];
+                    }
+                    addLog($state, "<strong>{$state['players'][$myIdx]['name']}</strong> 弃置了 2 张手牌应对【撒娇】");
+                    advanceAoeQueue($state);
                 } else {
-                    addLog($state, "<strong>{$state['players'][$myIdx]['name']}</strong> 未弃牌，受到 2 点伤害！");
+                    addLog($state, "<strong>{$state['players'][$myIdx]['name']}</strong> 未弃牌，受到 1 点伤害！");
                     if ($myIdx !== -1) {
-                        applyDamage($state, $state['players'][$myIdx], 2, $resp['from_uid'], $resp['from_name']);
+                        applyDamage($state, $state['players'][$myIdx], 1, $resp['from_uid'], $resp['from_name']);
                     }
                     advanceAoeQueue($state);
                 }
@@ -1072,9 +1132,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
                         }
                     }
                     addLog($state, "<strong>{$state['players'][$myIdx]['name']}</strong> 弃置了 {$discardedCount} 张手牌！");
-                    if ($state['players'][$myIdx]['marks']['ruiping'] > 0) {
-                        $state['players'][$myIdx]['marks']['ruiping']--;
-                    }
                     $state['pending_response'] = null;
                 }
             }
@@ -1092,39 +1149,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
             nextTurn($state);
         } elseif ($subAction === 'skill_jijiang' && $state['phase'] === 'JIJIANG_SELECT' && $curr['uid'] === $login_uid) {
             $tIdx = getPlayerIndexByUid($state, $targetUid);
-            if ($tIdx !== -1 && !$state['players'][$tIdx]['dead']) {
+            if ($tIdx !== -1 && !$state['players'][$tIdx]['dead'] && $state['players'][$tIdx]['uid'] !== $curr['uid']) {
                 $curr['marks']['xinxin'] -= 1;
                 $state['players'][$tIdx]['marks']['xinxin'] += 1;
-                addLog($state, "<strong>Ydch</strong> 将 1 枚“信心”标记转移给了 <strong>{$state['players'][$tIdx]['name']}</strong> 并对其造成 1 点伤害！");
+                addLog($state, "<span style='color:#3498db;font-weight:bold;'>【信心】</span> <strong>Ydch</strong> 将 1 枚“信心”标记转移给了 <strong>{$state['players'][$tIdx]['name']}</strong> 并对其造成 1 点伤害！");
                 applyDamage($state, $state['players'][$tIdx], 1, $curr['uid'], $curr['name']);
             }
             if (!checkDyingQueue($state)) {
                 startDrawAndPlayPhase($state);
             }
-        } elseif ($subAction === 'skill_rende' && $isMyTurn && $state['phase'] === 'PLAY' && empty($state['pending_response']) && !$state['used_rende'] && $curr['general']['name'] === 'Ydch') {
-            $maxM = -1;
-            $candidateIdx = -1;
-            foreach ($state['players'] as $idx => $p) {
-                if (!$p['dead'] && $p['uid'] !== $curr['uid'] && $p['marks']['xinxin'] > $maxM) {
-                    $maxM = $p['marks']['xinxin'];
-                    $candidateIdx = $idx;
+        } elseif ($subAction === 'respond_xiemi_give') {
+            $resp = $state['pending_response'];
+            if ($resp && $resp['type'] === 'xiemi_give' && $curr['uid'] === $login_uid) {
+                if (!isset($curr['hand'][$cardIdx])) {
+                    echo json_encode(['success' => false, 'msg' => '请先选择一张要交出的手牌']);
+                    exit;
                 }
-				else if (!$p['dead'] && $p['uid'] !== $curr['uid'] && $p['marks']['xinxin'] === $maxM && $maxM > 0) {
-					if ($candidateIdx !== -1 && $p['hp'] > $state['players'][$candidateIdx]['hp']) {
-						$candidateIdx = $idx;
-					}
-				}
-            }
-            if ($candidateIdx !== -1 && $maxM > 0) {
-                $state['used_rende'] = true;
-                $oldCurrHp = $curr['hp'];
-                $oldTgtHp = $state['players'][$candidateIdx]['hp'];
-                $curr['hp'] = min($curr['maxHp'], $oldTgtHp);
-                $state['players'][$candidateIdx]['hp'] = min($state['players'][$candidateIdx]['maxHp'], $oldCurrHp);
-                addLog($state, "<span style='color:#f39c12;font-weight:bold;'>【仁德】</span> Ydch 与信心最多者 <strong>{$state['players'][$candidateIdx]['name']}</strong> 交换了体力值！(Ydch: {$curr['hp']}, {$state['players'][$candidateIdx]['name']}: {$state['players'][$candidateIdx]['hp']})");
-            } else {
-                echo json_encode(['success' => false, 'msg' => '场上其他角色中没有拥有“信心”标记的目标']);
-                exit;
+                $tIdx = getPlayerIndexByUid($state, $resp['target_uid']);
+                if ($tIdx !== -1 && !$state['players'][$tIdx]['dead']) {
+                    $card = array_splice($curr['hand'], $cardIdx, 1)[0];
+                    $state['players'][$tIdx]['hand'][] = $card;
+                    addLog($state, "<span style='color:#f39c12;font-weight:bold;'>【泄密】</span> <strong>{$curr['name']}</strong> 将一张手牌 [{$card['suit']}{$card['num']} {$card['name']}] 交给了 <strong>{$state['players'][$tIdx]['name']}</strong>！");
+                }
+                $state['pending_response'] = null;
             }
         } elseif ($subAction === 'skill_ruiping' && $isMyTurn && $state['phase'] === 'PLAY' && !$state['used_ruiping'] && empty($state['pending_response']) && $curr['general']['name'] === 'Gary0') {
             $state['used_ruiping'] = true;
@@ -1133,14 +1180,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
                 $tp = &$state['players'][$tIdx];
                 addLog($state, "<span style='color:#3498db;font-weight:bold;'>【瑞平】</span> <strong>{$curr['name']}</strong> 锐评了 <strong>{$tp['name']}</strong>");
                 if ($tp['marks']['ruiping'] > 0) {
-                    $tp['marks']['ruiping'] -= 1;
                     if (count($tp['hand']) <= 2) {
                         $discCount = count($tp['hand']);
                         foreach ($tp['hand'] as $dh) $state['discard'][] = $dh;
                         $tp['hand'] = [];
-                        addLog($state, "<strong>{$tp['name']}</strong> 已有瑞平标记，弃置了全部 ({$discCount}) 张手牌并失去了 1 个瑞平标记！");
+                        addLog($state, "<strong>{$tp['name']}</strong> 已有“瑞平”标记，弃置了全部 ({$discCount}) 张手牌！");
                     } else {
-                        addLog($state, "<strong>{$tp['name']}</strong> 已有瑞平标记，失去了 1 个瑞平标记，需自主选择弃置 2 张手牌！");
+                        addLog($state, "<strong>{$tp['name']}</strong> 已有“瑞平”标记，需自主选择弃置 2 张手牌！");
                         $state['pending_response'] = [
                             'type' => 'ruiping_discard',
                             'target_uid' => $tp['uid'],
@@ -1153,36 +1199,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
                     addLog($state, "<strong>{$tp['name']}</strong> 获得了 1 枚“瑞平”标记");
                 }
             }
-        } elseif ($subAction === 'skill_zhipai' && $isMyTurn && $state['phase'] === 'PLAY' && empty($state['pending_response']) && !$state['used_zhipai'] && !$state['used_ruiping'] && $curr['general']['name'] === 'Gary0') {
-            $state['used_zhipai'] = true;
+        } elseif ($subAction === 'skill_zhipai' && $isMyTurn && $state['phase'] === 'PLAY' && empty($state['pending_response']) && $curr['general']['name'] === 'Gary0') {
             $tIdx = getPlayerIndexByUid($state, $targetUid);
-            if ($tIdx !== -1 && !$state['players'][$tIdx]['dead'] && $state['players'][$tIdx]['marks']['ruiping'] > 0) {
+            if ($tIdx !== -1 && $tIdx !== (int)$state['turn_index'] && !$state['players'][$tIdx]['dead'] && $state['players'][$tIdx]['marks']['ruiping'] > 0) {
                 $tp = &$state['players'][$tIdx];
+                $markCnt = (int)$tp['marks']['ruiping'];
                 $tp['marks']['ruiping'] = 0;
-                addLog($state, "<span style='color:#e74c3c;font-weight:bold;'>【制牌】</span> <strong>{$curr['name']}</strong> 对 <strong>{$tp['name']}</strong> 使用了 lycuim 制牌！令其受到 2 点伤害并失去所有“瑞平”标记！");
-                $curr['flipped'] = true;
-                addLog($state, "<strong>{$curr['name']}</strong> 翻面，且回合直接结束（跳过弃牌阶段）！");
-                applyDamage($state, $tp, 2, $curr['uid'], $curr['name']);
-                if (!empty($state['pending_response'])) {
-                    $state['end_turn_pending'] = true;
+                addLog($state, "<span style='color:#e74c3c;font-weight:bold;'>【制牌】</span> <strong>{$curr['name']}</strong> 对 <strong>{$tp['name']}</strong> 使用了 lycuim 制牌！其失去了 {$markCnt} 个“瑞平”标记，<strong>{$curr['name']}</strong> 开始排列其手牌...");
+                $state['pending_response'] = [
+                    'type' => 'zhipai_arrange',
+                    'from_uid' => $curr['uid'],
+                    'from_name' => $curr['name'],
+                    'target_uid' => $tp['uid'],
+                    'target_name' => $tp['name']
+                ];
+            } else {
+                echo json_encode(['success' => false, 'msg' => '目标必须是拥有“瑞平”标记的其他角色']);
+                exit;
+            }
+        } elseif ($subAction === 'zhipai_confirm') {
+            $resp = $state['pending_response'];
+            if ($resp && $resp['type'] === 'zhipai_arrange' && (int)$resp['from_uid'] === $login_uid) {
+                $state['pending_response'] = null;
+                $tIdx = getPlayerIndexByUid($state, $resp['target_uid']);
+                if ($tIdx === -1 || $state['players'][$tIdx]['dead']) {
+                    addLog($state, "<span style='color:#e74c3c;font-weight:bold;'>【制牌】</span> 目标已阵亡，制牌无效...");
                 } else {
-                    nextTurn($state);
+                    $tp = &$state['players'][$tIdx];
+                    $cids = json_decode($_POST['card_cids'] ?? '[]', true);
+                    if (!is_array($cids)) $cids = [];
+                    $cids = array_values(array_unique($cids));
+                    $byCid = [];
+                    foreach ($tp['hand'] as $c) $byCid[$c['cid']] = $c;
+                    $insertList = [];
+                    foreach ($cids as $cidKey) {
+                        if (isset($byCid[$cidKey])) {
+                            $insertList[] = $byCid[$cidKey];
+                            unset($byCid[$cidKey]);
+                        }
+                    }
+                    $restList = array_values($byCid);
+                    if (!empty($insertList)) {
+                        // 依次点击的顺序 = 插入牌堆顶的顺序（先点的在最上面，先被摸到）
+                        $state['deck'] = array_merge($state['deck'], array_reverse($insertList));
+                    }
+                    if (!empty($restList)) {
+                        $curr['hand'] = array_merge($curr['hand'], $restList);
+                    }
+                    $tp['hand'] = [];
+                    $wasFlipped = !empty($curr['flipped']);
+                    $curr['flipped'] = true;
+                    addLog($state, "<span style='color:#e74c3c;font-weight:bold;'>【制牌】</span> <strong>{$curr['name']}</strong> 将 <strong>{$tp['name']}</strong> 的 " . count($insertList) . " 张手牌插入了牌堆顶，获得了其余 " . count($restList) . " 张牌！" . (!$wasFlipped ? " 随后翻面！" : ''));
                 }
             }
         } elseif ($subAction === 'skill_sajiao' && $isMyTurn && $state['phase'] === 'PLAY' && !$state['used_sajiao'] && empty($state['pending_response']) && $curr['general']['name'] === '小猫娘FR') {
-            $indices = json_decode($_POST['card_indices'] ?? '[]', true);
-            if (count($indices) !== 2 || !isset($curr['hand'][$indices[0]]) || !isset($curr['hand'][$indices[1]])) {
-                echo json_encode(['success' => false, 'msg' => '发动【撒娇】必须弃置 2 张手牌']);
-                exit;
-            }
-            rsort($indices);
-            $c1 = array_splice($curr['hand'], $indices[0], 1)[0];
-            $c2 = array_splice($curr['hand'], $indices[1], 1)[0];
-            $state['discard'][] = $c1;
-            $state['discard'][] = $c2;
-
             $state['used_sajiao'] = true;
-            addLog($state, "<span style='color:#f39c12;font-weight:bold;'>【撒娇】</span> <strong>{$curr['name']}</strong> 弃置了 2 张手牌进行卖萌！场上所有角色（包括自己）需弃置一张【杀】或【闪】，否则受到 2 点伤害！");
+            addLog($state, "<span style='color:#f39c12;font-weight:bold;'>【撒娇】</span> <strong>{$curr['name']}</strong> 进行了卖萌！场上所有角色（包括自己）需弃置 2 张手牌，否则受到 1 点伤害！");
             $targets = [];
             $pCount = count($state['players']);
             for ($i = 0; $i < $pCount; $i++) {
@@ -1200,6 +1272,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
                 ];
             }
         } elseif ($subAction === 'skill_tiaojiao' && $isMyTurn && $state['phase'] === 'PLAY' && !$state['used_tiaojiao'] && empty($state['pending_response']) && $curr['general']['name'] === 'Rabo') {
+            if (!empty($state['no_tiaojiao_extra'])) {
+                echo json_encode(['success' => false, 'msg' => '【控制】的额外回合内无法使用【调教】']);
+                exit;
+            }
             $tIdx = getPlayerIndexByUid($state, $targetUid);
             if ($tIdx !== -1 && !$state['players'][$tIdx]['dead']) {
                 $state['used_tiaojiao'] = true;
@@ -1209,16 +1285,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
                 $state['players'][$tIdx]['marks']['xiaomaoliang']++;
                 addLog($state, "<span style='color:#9b59b6;font-weight:bold;'>【调教】</span> <strong>{$curr['name']}</strong> 令 <strong>{$state['players'][$tIdx]['name']}</strong> 获得了 1 个“小猫梁”标记！");
             }
-        } elseif ($subAction === 'skill_guanshui' && $isMyTurn && $state['phase'] === 'PLAY' && !$state['used_guanshui'] && empty($state['pending_response'])) {
+        } elseif ($subAction === 'skill_guanshui' && $isMyTurn && $state['phase'] === 'PLAY' && !$state['used_guanshui'] && empty($state['pending_response']) && $curr['general']['name'] === '小猫娘FR') {
             $state['used_guanshui'] = true;
-            addLog($state, "<span style='color:#3498db;font-weight:bold;'>【灌水】限定技</span> 爆发！<strong>{$curr['name']}</strong> 拿走了场上所有人的全部手牌！");
-            foreach ($state['players'] as &$p) {
-                if (!$p['dead'] && $p['uid'] !== $curr['uid']) {
-                    $curr['hand'] = array_merge($curr['hand'], $p['hand']);
-                    $p['hand'] = [];
+            addLog($state, "<span style='color:#3498db;font-weight:bold;'>【灌水】限定技</span> <strong>{$curr['name']}</strong> 开始从所有其他玩家的手牌中挑选至多 4 张！");
+            $state['pending_response'] = [
+                'type' => 'guanshui_select',
+                'from_uid' => $curr['uid'],
+                'from_name' => $curr['name']
+            ];
+        } elseif ($subAction === 'guanshui_confirm') {
+            $resp = $state['pending_response'];
+            if ($resp && $resp['type'] === 'guanshui_select' && (int)$resp['from_uid'] === $login_uid) {
+                $state['pending_response'] = null;
+                $cids = json_decode($_POST['card_cids'] ?? '[]', true);
+                if (!is_array($cids)) $cids = [];
+                $cids = array_values(array_unique($cids));
+                if (count($cids) > 4) $cids = array_slice($cids, 0, 4);
+                $chosen = [];
+                $discardedTotal = 0;
+                foreach ($state['players'] as &$p) {
+                    if (!$p['dead'] && $p['uid'] !== $curr['uid']) {
+                        foreach ($p['hand'] as $c) {
+                            $pos = array_search($c['cid'], $cids, true);
+                            if ($pos !== false && count($chosen) < 4) {
+                                $chosen[] = $c;
+                                unset($cids[$pos]);
+                            } else {
+                                $state['discard'][] = $c;
+                                $discardedTotal++;
+                            }
+                        }
+                        $p['hand'] = [];
+                    }
                 }
+                unset($p);
+                if (!empty($chosen)) {
+                    $curr['hand'] = array_merge($curr['hand'], $chosen);
+                }
+                addLog($state, "<span style='color:#3498db;font-weight:bold;'>【灌水】限定技</span> <strong>{$curr['name']}</strong> 获得了 " . count($chosen) . " 张手牌，弃置了场上其余 {$discardedTotal} 张手牌，回合直接结束（跳过弃牌阶段）！");
+                nextTurn($state);
             }
-            unset($p);
         } elseif ($subAction === 'play_card' && $isMyTurn && $state['phase'] === 'PLAY' && empty($state['pending_response'])) {
             if (isset($curr['hand'][$cardIdx])) {
                 $card = $curr['hand'][$cardIdx];
@@ -1483,31 +1589,15 @@ if (file_exists('navbar.php')) {
             <div style="margin-top:16px;" id="general-select-wrap">
                 <h4 style="font-size:14px; margin-bottom:8px;">选择出战武将：</h4>
                 <div class="general-picker">
-                    <div class="gen-opt" onclick="pickGeneral(1)" id="g-opt-1">
-                        <img src="/upload/lolmtoj/1.png">
-                        <div style="font-weight:bold;">Ydch (体力: 3)</div>
-                        <div style="font-size:11px; color:#666;">【激将】【仁德】</div>
-                    </div>
-                    <div class="gen-opt" onclick="pickGeneral(2)" id="g-opt-2">
-                        <img src="/upload/lolmtoj/2.png">
-                        <div style="font-weight:bold;">六面体 (体力: 4)</div>
-                        <div style="font-size:11px; color:#666;">【暴政】</div>
-                    </div>
-                    <div class="gen-opt" onclick="pickGeneral(3)" id="g-opt-3">
-                        <img src="/upload/lolmtoj/3.png">
-                        <div style="font-weight:bold;">Gary0 (体力: 2)</div>
-                        <div style="font-size:11px; color:#666;">【瑞平】【制牌】</div>
-                    </div>
-                    <div class="gen-opt" onclick="pickGeneral(4)" id="g-opt-4">
-                        <img src="/upload/lolmtoj/4.png">
-                        <div style="font-weight:bold;">小猫娘FR (体力: 2)</div>
-                        <div style="font-size:11px; color:#666;">【撒娇】【灌水】</div>
-                    </div>
-                    <div class="gen-opt" onclick="pickGeneral(5)" id="g-opt-5">
-                        <img src="/upload/lolmtoj/5.png">
-                        <div style="font-weight:bold;">Rabo (体力: 3)</div>
-                        <div style="font-size:11px; color:#666;">【调教】【控制】</div>
-                    </div>
+                    <?php foreach ($GENERALS_CONFIG as $genId => $gen) : ?>
+                        <div class="gen-opt" onclick="pickGeneral(<?= $genId ?>)" id="g-opt-<?= $genId ?>">
+                            <img src="<?= htmlspecialchars($gen['avatar']) ?>">
+                            <div style="font-weight:bold;"><?= htmlspecialchars($gen['name']) ?> (体力: <?= (int) $gen['hp'] ?>)</div>
+                            <div style="font-size:11px; color:#666;"><?= htmlspecialchars(implode('', array_map(function ($s) {
+                                return '【' . $s['name'] . '】';
+                            }, $gen['skills']))) ?></div>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
             </div>
             <div style="margin-top:14px; display:flex; justify-content:space-between; align-items:center;" id="ready-btn-wrap">
@@ -1575,6 +1665,8 @@ let myUid = <?= $login_uid ?>;
 let isSpectatorMode = false;
 let selectedCardIdx = null;
 let selectedDiscardIndices = [];
+let guanshuiPicks = [];
+let zhipaiPicks = [];
 let targetMode = null;
 let targetModePrompt = '';
 let _captcha_shown = false;
@@ -1939,14 +2031,20 @@ function renderGame(state, isSpectator = false, room = {}) {
             const curTargetUid = state.pending_response.targets[0];
             const curTargetObj = state.players.find(p => p.uid === curTargetUid);
             const curTargetName = curTargetObj ? curTargetObj.name : '玩家';
-            statusText = `【撒娇】进行中！等待 <strong>${curTargetName}</strong> 弃置【杀】或【闪】...`;
+            statusText = `【撒娇】进行中！等待 <strong>${curTargetName}</strong> 弃置 2 张手牌或受到 1 点伤害...`;
         } else if (state.pending_response.type === 'ruiping_discard') {
             statusText = `等待 <strong>${state.pending_response.target_name}</strong> 弃置 2 张手牌...`;
+        } else if (state.pending_response.type === 'xiemi_give') {
+            statusText = `【泄密】<strong>${escapeHtml(state.pending_response.actor_name || currPlayer.name)}</strong> 必须将一张手牌交给 <strong>${escapeHtml(state.pending_response.target_name)}</strong>...`;
+        } else if (state.pending_response.type === 'guanshui_select') {
+            statusText = `【灌水】<strong>${escapeHtml(state.pending_response.from_name)}</strong> 正在从场上手牌中挑选至多 4 张...`;
+        } else if (state.pending_response.type === 'zhipai_arrange') {
+            statusText = `【制牌】<strong>${escapeHtml(state.pending_response.from_name)}</strong> 正在排列 <strong>${escapeHtml(state.pending_response.target_name)}</strong> 的手牌...`;
         }
     } else if (state.phase === 'DISCARD') {
         statusText = `<strong>${currPlayer.name}</strong> 正在弃牌...`;
     } else if (state.phase === 'JIJIANG_SELECT') {
-        statusText = `Ydch 正在选择“信心”转移目标并造成伤害...`;
+        statusText = `Ydch 的【信心】：选择一名其他角色转移“信心”标记并造成 1 点伤害...`;
     }
     document.getElementById('game-status-tip').innerHTML = statusText;
 
@@ -1956,13 +2054,13 @@ function renderGame(state, isSpectator = false, room = {}) {
     if (!isSpectator && my && !isGameFinished) {
         const selectedHandCard = (selectedCardIdx !== null && my.hand[selectedCardIdx]) ? my.hand[selectedCardIdx] : null;
 
-        if (targetMode === 'SAJIAO_DISCARD') {
+        if (state.pending_response && state.pending_response.type === 'xiemi_give' && isMyTurn) {
+            const isCardChosen = selectedCardIdx !== null && !!my.hand[selectedCardIdx];
             promptArea.innerHTML = `
                 <div class="discard-prompt-banner">
-                    <div>发动【撒娇】需弃置 <strong>2</strong> 张手牌（已选 ${selectedDiscardIndices.length} / 2）：</div>
+                    <div>【泄密】锁定技：必须将一张手牌交给“信心”标记最多的 <strong>${escapeHtml(state.pending_response.target_name)}</strong>（已选 ${isCardChosen ? 1 : 0} / 1）：</div>
                     <div style="display:flex; gap:6px;">
-                        <button class="btn btn-danger" ${selectedDiscardIndices.length !== 2 ? 'disabled' : ''} onclick="sendSajiaoAction()">确认发动</button>
-                        <button class="btn btn-sm" onclick="cancelTargetSelect()">取消</button>
+                        <button class="btn btn-gold" ${!isCardChosen ? 'disabled' : ''} onclick="sendXiemiGive()">交出所选手牌</button>
                     </div>
                 </div>
             `;
@@ -2024,17 +2122,57 @@ function renderGame(state, isSpectator = false, room = {}) {
             }
         } else if (state.pending_response && state.pending_response.type === 'aoe_sajiao') {
             if (state.pending_response.targets.length > 0 && state.pending_response.targets[0] === myUid) {
-                let isCardValid = selectedHandCard && (selectedHandCard.name === '杀' || selectedHandCard.name === '闪');
                 promptArea.innerHTML = `
                     <div class="respond-banner">
-                        <div><strong>${state.pending_response.from_name}</strong> 发动了【撒娇】！请选择一张【杀】或【闪】弃置：</div>
+                        <div><strong>${escapeHtml(state.pending_response.from_name)}</strong> 发动了【撒娇】卖萌！请选择：弃置 <strong>2</strong> 张手牌，或受到 <strong>1</strong> 点伤害（已选 ${selectedDiscardIndices.length} / 2）：</div>
                         <div style="display:flex; gap:8px;">
-                            <button class="btn btn-gold" ${!isCardValid ? 'disabled' : ''} onclick="sendAoeSajiaoResponse(true)">${isCardValid ? `弃置[${selectedHandCard.suit}${selectedHandCard.num} ${selectedHandCard.name}]` : '请选择一张【杀】或【闪】'}</button>
-                            <button class="btn btn-danger" onclick="sendAoeSajiaoResponse(false)">不出 (受到2点伤害)</button>
+                            <button class="btn btn-gold" ${selectedDiscardIndices.length !== 2 ? 'disabled' : ''} onclick="sendAoeSajiaoResponse(true)">弃置两张手牌</button>
+                            <button class="btn btn-danger" onclick="sendAoeSajiaoResponse(false)">不弃牌 (受到1点伤害)</button>
                         </div>
                     </div>
                 `;
             }
+        } else if (state.pending_response && state.pending_response.type === 'guanshui_select' && isMyTurn) {
+            const gsPool = state.pending_response.pool_view || [];
+            const gsPoolHtml = gsPool.map(c => {
+                const picked = guanshuiPicks.includes(c.cid);
+                return `
+                    <div class="lolmtoj-card ${c.color} ${picked ? 'selected' : ''}" style="width:58px; height:76px;" onclick="toggleGuanshuiPick('${c.cid}')">
+                        <div style="display:flex; justify-content:space-between; font-size:10px; font-weight:bold;"><span>${c.suit}</span><span>${c.num}</span></div>
+                        <div style="text-align:center; font-weight:bold; font-size:12px; margin:auto 0;">${c.name}</div>
+                        <div style="text-align:right; font-size:8px; color:#888;">${escapeHtml(c.owner_name)}</div>
+                    </div>`;
+            }).join('');
+            promptArea.innerHTML = `
+                <div class="discard-prompt-banner" style="display:block;">
+                    <div style="margin-bottom:6px;">【灌水】限定技：从所有其他玩家的手牌中任选 <strong>至多 4</strong> 张获得，其余全部弃置，随后你的回合直接结束（已选 ${guanshuiPicks.length} / 4）：</div>
+                    <div style="display:flex; gap:6px; overflow-x:auto; padding:4px 0; min-height:82px; align-items:flex-end;">${gsPoolHtml || '<span style="color:#999; font-size:12px;">场上其他玩家没有手牌</span>'}</div>
+                    <div style="margin-top:6px; display:flex; gap:6px; justify-content:flex-end;">
+                        <button class="btn btn-danger" onclick="sendGuanshuiConfirm()">确认灌水（获得所选 ${guanshuiPicks.length} 张，弃置其余并结束回合）</button>
+                    </div>
+                </div>
+            `;
+        } else if (state.pending_response && state.pending_response.type === 'zhipai_arrange' && isMyTurn) {
+            const zpPool = state.pending_response.pool_view || [];
+            const zpTargetName = escapeHtml(state.pending_response.target_name);
+            const zpPoolHtml = zpPool.map(c => {
+                const order = zhipaiPicks.indexOf(c.cid);
+                return `
+                    <div class="lolmtoj-card ${c.color} ${order >= 0 ? 'selected' : ''}" style="width:58px; height:76px; position:relative;" onclick="toggleZhipaiPick('${c.cid}')">
+                        ${order >= 0 ? `<span style="position:absolute; top:2px; left:50%; transform:translateX(-50%); background:#2ecc71; color:#000; font-size:10px; font-weight:bold; padding:0 4px; border-radius:4px;">顶${order + 1}</span>` : ''}
+                        <div style="display:flex; justify-content:space-between; font-size:10px; font-weight:bold;"><span>${c.suit}</span><span>${c.num}</span></div>
+                        <div style="text-align:center; font-weight:bold; font-size:12px; margin:auto 0;">${c.name}</div>
+                    </div>`;
+            }).join('');
+            promptArea.innerHTML = `
+                <div class="discard-prompt-banner" style="display:block;">
+                    <div style="margin-bottom:6px;">【制牌】：点击排列 <strong>${zpTargetName}</strong> 的手牌——所选按顺序插入牌堆顶（标注“顶1”的最先被摸到），<strong>未选中的牌全部由你获得</strong>，随后你翻面：</div>
+                    <div style="display:flex; gap:6px; overflow-x:auto; padding:4px 0; min-height:82px; align-items:flex-end;">${zpPoolHtml || '<span style="color:#999; font-size:12px;">目标没有手牌</span>'}</div>
+                    <div style="margin-top:6px; display:flex; gap:6px; justify-content:flex-end;">
+                        <button class="btn btn-gold" onclick="sendZhipaiConfirm()">确认制牌（${zhipaiPicks.length} 张插入牌堆顶，其余 ${zpPool.length - zhipaiPicks.length} 张你获得）</button>
+                    </div>
+                </div>
+            `;
         } else if (state.pending_response && state.pending_response.type === 'ruiping_discard') {
             if (state.pending_response.target_uid === myUid) {
                 promptArea.innerHTML = `
@@ -2066,7 +2204,7 @@ function renderGame(state, isSpectator = false, room = {}) {
     oppBox.innerHTML = '';
     state.players.forEach(p => {
         if (!isSpectator && p.uid === myUid) return;
-        let isTargetable = !isSpectator && targetMode !== null && targetMode !== 'SAJIAO_DISCARD' && !p.dead && !isGameFinished;
+        let isTargetable = !isSpectator && targetMode !== null && !p.dead && !isGameFinished;
         if (targetMode === 'SKILL_ZHIPAI' && p.marks.ruiping <= 0) isTargetable = false;
 
         let div = document.createElement('div');
@@ -2106,41 +2244,36 @@ function renderGame(state, isSpectator = false, room = {}) {
     document.getElementById('btn-play').disabled = !canPlayThisCard;
     document.getElementById('btn-end').disabled = !canPlay;
 
+    if (!state.pending_response || state.pending_response.type !== 'guanshui_select') guanshuiPicks = [];
+    if (!state.pending_response || state.pending_response.type !== 'zhipai_arrange') zhipaiPicks = [];
+
     if (my.general.name === 'Ydch') {
         if (state.phase === 'JIJIANG_SELECT' && isMyTurn) {
             targetMode = 'SKILL_JIJIANG';
-            targetModePrompt = '【激将】：必须选择一名其他角色转移“信心”标记并对其造成1点伤害';
+            targetModePrompt = '【信心】：必须选择一名其他角色，将“信心”标记转移给该角色并对其造成 1 点伤害';
         }
-        let bRende = document.createElement('button');
-        bRende.className = 'btn btn-gold';
-        bRende.innerText = '技能: 仁德';
-        bRende.disabled = !canPlay || state.used_rende;
-        bRende.onclick = () => sendAction('skill_rende');
-        btnBox.appendChild(bRende);
     } else if (my.general.name === 'Gary0') {
         let b1 = document.createElement('button');
         b1.className = 'btn btn-gold';
         b1.innerText = '技能: 瑞平';
         b1.disabled = !canPlay || state.used_ruiping;
-        b1.onclick = () => { targetMode = 'SKILL_RUIPING'; targetModePrompt = '【瑞平】：请选择一名角色施加标记（已有标记则令其弃2牌并失去1个标记）'; renderGame(state, isSpectator); };
+        b1.onclick = () => { targetMode = 'SKILL_RUIPING'; targetModePrompt = '【瑞平】：请选择一名角色（无标记→其获得 1 个“瑞平”标记；已有标记→其弃置 2 张手牌）'; renderGame(state, isSpectator); };
         btnBox.appendChild(b1);
 
+        let hasMarkedOpponent = state.players.some(p => p.uid !== myUid && !p.dead && p.marks.ruiping > 0);
         let b2 = document.createElement('button');
         b2.className = 'btn btn-danger';
         b2.innerText = '技能: 制牌';
-        b2.disabled = !canPlay || state.used_zhipai || state.used_ruiping;
-        b2.onclick = () => { targetMode = 'SKILL_ZHIPAI'; targetModePrompt = '【制牌】：指定一名带“瑞平”标记的角色令其受到2点伤害并清空标记，随后你翻面且直接结束回合'; renderGame(state, isSpectator); };
+        b2.disabled = !canPlay || !hasMarkedOpponent;
+        b2.title = '指定一名拥有“瑞平”标记的角色：其失去所有标记，你排列其全部手牌（若干张插到牌堆顶，其余你获得），随后若你未翻面则翻面';
+        b2.onclick = () => { targetMode = 'SKILL_ZHIPAI'; targetModePrompt = '【制牌】：选择一名拥有“瑞平”标记的角色，其失去所有标记；其全部手牌由你排列（若干张插到牌堆顶，其余你获得），随后你翻面'; renderGame(state, isSpectator); };
         btnBox.appendChild(b2);
     } else if (my.general.name === '小猫娘FR') {
         let b1 = document.createElement('button');
         b1.className = 'btn btn-gold';
         b1.innerText = '技能: 撒娇';
-        b1.disabled = !canPlay || state.used_sajiao || my.hand.length < 2;
-        b1.onclick = () => {
-            selectedDiscardIndices = [];
-            targetMode = 'SAJIAO_DISCARD';
-            renderGame(state, isSpectator);
-        };
+        b1.disabled = !canPlay || state.used_sajiao;
+        b1.onclick = () => sendAction('skill_sajiao');
         btnBox.appendChild(b1);
 
         let b2 = document.createElement('button');
@@ -2150,17 +2283,19 @@ function renderGame(state, isSpectator = false, room = {}) {
         b2.onclick = () => sendAction('skill_guanshui');
         btnBox.appendChild(b2);
     } else if (my.general.name === 'Rabo') {
+        let extraTurnBlock = !!(state.no_tiaojiao_extra && isMyTurn);
         let b1 = document.createElement('button');
         b1.className = 'btn btn-gold';
         b1.innerText = '技能: 调教';
-        b1.disabled = !canPlay || state.used_tiaojiao;
+        b1.disabled = !canPlay || state.used_tiaojiao || extraTurnBlock;
+        if (extraTurnBlock) b1.title = '【控制】的额外回合内无法使用【调教】';
         b1.onclick = () => { targetMode = 'SKILL_TIAOJIAO'; targetModePrompt = '【调教】：请选择一名角色获得一个“小猫梁”标记'; renderGame(state, isSpectator); };
         btnBox.appendChild(b1);
     }
 
-    const isDiscardMode = (state.phase === 'DISCARD' && isMyTurn) || 
+    const isDiscardMode = (state.phase === 'DISCARD' && isMyTurn) ||
         (state.pending_response && state.pending_response.type === 'ruiping_discard' && state.pending_response.target_uid === myUid) ||
-        (targetMode === 'SAJIAO_DISCARD');
+        (state.pending_response && state.pending_response.type === 'aoe_sajiao' && state.pending_response.targets.length > 0 && state.pending_response.targets[0] === myUid);
 
     const handBox = document.getElementById('my-handcards');
     handBox.innerHTML = '';
@@ -2174,7 +2309,8 @@ function renderGame(state, isSpectator = false, room = {}) {
                 if (selectedDiscardIndices.includes(idx)) {
                     selectedDiscardIndices = selectedDiscardIndices.filter(i => i !== idx);
                 } else {
-                    if (targetMode === 'SAJIAO_DISCARD' && selectedDiscardIndices.length >= 2) {
+                    const capAtTwo = !(state.phase === 'DISCARD' && isMyTurn && state.discard_needed > 2);
+                    if (capAtTwo && selectedDiscardIndices.length >= 2) {
                         selectedDiscardIndices.shift();
                     }
                     selectedDiscardIndices.push(idx);
@@ -2267,11 +2403,38 @@ function onSelectTarget(targetUid) {
     selectedCardIdx = null;
 }
 
-function sendSajiaoAction() {
-    if (selectedDiscardIndices.length !== 2) return;
-    sendAction('skill_sajiao', { card_indices: JSON.stringify(selectedDiscardIndices) });
-    selectedDiscardIndices = [];
-    targetMode = null;
+function sendXiemiGive() {
+    if (selectedCardIdx === null) return;
+    sendAction('respond_xiemi_give', { card_index: selectedCardIdx });
+    selectedCardIdx = null;
+}
+
+function sendGuanshuiConfirm() {
+    sendAction('guanshui_confirm', { card_cids: JSON.stringify(guanshuiPicks) });
+    guanshuiPicks = [];
+}
+
+function sendZhipaiConfirm() {
+    sendAction('zhipai_confirm', { card_cids: JSON.stringify(zhipaiPicks) });
+    zhipaiPicks = [];
+}
+
+function toggleGuanshuiPick(cid) {
+    const i = guanshuiPicks.indexOf(cid);
+    if (i >= 0) guanshuiPicks.splice(i, 1);
+    else if (guanshuiPicks.length < 4) guanshuiPicks.push(cid);
+    refreshRender();
+}
+
+function toggleZhipaiPick(cid) {
+    const i = zhipaiPicks.indexOf(cid);
+    if (i >= 0) zhipaiPicks.splice(i, 1);
+    else zhipaiPicks.push(cid);
+    refreshRender();
+}
+
+function refreshRender() {
+    if (window._currentGameState) renderGame(window._currentGameState, isSpectatorMode);
 }
 
 function sendDyingPeach(usePeach) {
@@ -2295,8 +2458,8 @@ function sendAoeNanmanResponse(useSha) {
 }
 
 function sendAoeSajiaoResponse(useCard) {
-    sendAction('respond_aoe_sajiao', { use_card: useCard ? 1 : 0, card_index: selectedCardIdx !== null ? selectedCardIdx : -1 });
-    selectedCardIdx = null;
+    sendAction('respond_aoe_sajiao', { use_card: useCard ? 1 : 0, card_indices: JSON.stringify(selectedDiscardIndices) });
+    selectedDiscardIndices = [];
 }
 
 function sendRuipingDiscard() {
