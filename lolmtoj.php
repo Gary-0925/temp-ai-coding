@@ -127,7 +127,7 @@ $GENERALS_CONFIG = [
         'avatar' => '/upload/lolmtoj/1.png',
         'skills' => [
             ['name' => '信心', 'type' => '锁定技', 'desc' => '准备阶段，若你拥有“信心”标记，你必须指定一名其他角色并将标记转移给该角色，该角色受到一点伤害；否则你获得“信心”标记，并恢复一点体力。'],
-            ['name' => '泄密', 'type' => '出牌技', 'desc' => '锁定技，出牌阶段限一次，若你拥有手牌，你必须指定一个拥有“信心”标记最多的角色，该角色获得你一张手牌。']
+            ['name' => '泄密', 'type' => '技能', 'desc' => '锁定技，出牌阶段限一次，若你拥有手牌，你必须指定一个拥有“信心”标记最多的角色，该角色获得你一张手牌。']
         ]
     ],
     2 => [
@@ -147,8 +147,8 @@ $GENERALS_CONFIG = [
         'maxHp' => 3,
         'avatar' => '/upload/lolmtoj/3.png',
         'skills' => [
-            ['name' => '瑞平', 'type' => '出牌技', 'desc' => '出牌阶段限一次，你可以指定一名角色，若该角色已有“瑞平”标记，其弃置两张手牌；否则其获得一个“瑞平”标记。'],
-            ['name' => '制牌', 'type' => '出牌技', 'desc' => '你可以指定一名拥有“瑞平”标记的角色并使用lycuim制牌，其失去所有瑞平标记，你将该角色所有手牌任意排列后将若干张（可为零）插入到牌堆顶，并获得其余牌。随后若你还未翻面，你翻面。']
+            ['name' => '瑞平', 'type' => '技能', 'desc' => '出牌阶段限一次，你可以指定一名角色，若该角色已有“瑞平”标记，其弃置两张手牌；否则其获得一个“瑞平”标记。'],
+            ['name' => '制牌', 'type' => '技能', 'desc' => '你可以指定一名拥有“瑞平”标记的角色并使用lycuim制牌，其失去所有瑞平标记，你将该角色所有手牌任意排列后将若干张（可为零）插入到牌堆顶，并获得其余牌。随后若你还未翻面，你翻面。']
         ]
     ],
     4 => [
@@ -158,7 +158,7 @@ $GENERALS_CONFIG = [
         'maxHp' => 3,
         'avatar' => '/upload/lolmtoj/4.png',
         'skills' => [
-            ['name' => '撒娇', 'type' => '出牌技', 'desc' => '出牌阶段限一次，进行卖萌，场上所有角色（包括你）选择弃置两张手牌或受到一点伤害。'],
+            ['name' => '撒娇', 'type' => '技能', 'desc' => '出牌阶段限一次，进行卖萌，场上所有角色（包括你）选择弃置两张手牌或受到一点伤害。'],
             ['name' => '灌水', 'type' => '限定技', 'desc' => '限定技，你从所有玩家的手牌中任选至多四张获得，并弃置其余部分，随后你的回合直接结束（跳过弃牌阶段）。']
         ]
     ],
@@ -169,8 +169,19 @@ $GENERALS_CONFIG = [
         'maxHp' => 3,
         'avatar' => '/upload/lolmtoj/5.png',
         'skills' => [
-            ['name' => '调教', 'type' => '出牌技', 'desc' => '出牌阶段限一次，你可以指定一名角色获得一个“小猫梁”标记。'],
+            ['name' => '调教', 'type' => '技能', 'desc' => '出牌阶段限一次，你可以指定一名角色获得一个“小猫梁”标记。'],
             ['name' => '控制', 'type' => '锁定技', 'desc' => '锁定技，至少有两个“小猫梁”标记的角色的回合被替换为你的回合，但该额外的回合内你无法使用【调教】，随后其仅失去所有“小猫梁”标记。']
+        ]
+    ],
+    7 => [
+        'id' => 7,
+        'name' => 'zhoumurui',
+        'hp' => 3,
+        'maxHp' => 3,
+        'avatar' => '/upload/lolmtoj/7.png',
+        'skills' => [
+            ['name' => '暴论', 'type' => '技能', 'desc' => '出牌阶段限一次，你可以将一张【杀】当做任意一张锦囊牌使用，若此牌在结算时造成了伤害，防止此伤害。'],
+            ['name' => '自嘲', 'type' => '技能', 'desc' => '结束阶段，你可以重复从牌堆顶摸一张牌，直到手牌数达到X张（X为除你以外手牌最多的角色的手牌数）。']
         ]
     ]
 ];
@@ -461,6 +472,7 @@ function nextTurn(&$state)
     $state['used_ruiping'] = false;
     $state['used_sajiao'] = false;
     $state['used_tiaojiao'] = false;
+    $state['used_baolun'] = false;
     $state['pending_response'] = null;
 
     if ($curr['general']['name'] === '六面体') {
@@ -515,7 +527,6 @@ function startDrawAndPlayPhase(&$state)
     addLog($state, "<strong>{$curr['name']}</strong> 摸了 2 张牌");
     $state['phase'] = 'PLAY';
 
-    // Ydch【泄密】锁定技：出牌阶段限一次，若有手牌，必须将一张手牌交给“信心”标记最多的角色
     if ($curr['general']['name'] === 'Ydch' && !$curr['dead'] && count($curr['hand']) > 0) {
         $maxM = 0;
         foreach ($state['players'] as $p) {
@@ -543,6 +554,27 @@ function startDrawAndPlayPhase(&$state)
             }
         }
     }
+}
+
+function askZichao(&$state)
+{
+    $curr = &$state['players'][$state['turn_index']];
+    if ($curr['general']['name'] !== 'zhoumurui' || $curr['dead']) {
+        nextTurn($state);
+        return;
+    }
+    $maxHand = 0;
+    foreach ($state['players'] as $p) {
+        if (!$p['dead'] && $p['uid'] !== $curr['uid']) {
+            $maxHand = max($maxHand, count($p['hand']));
+        }
+    }
+    $state['pending_response'] = [
+        'type' => 'zichao_ask',
+        'target_uid' => $curr['uid'],
+        'target_name' => $curr['name'],
+        'max_hand' => $maxHand
+    ];
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
@@ -646,7 +678,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
         $ready = (int) ($_POST['is_ready'] ?? 0);
 
         if ($genId > 0) {
-            $genId = max(1, min(5, $genId));
+            if (!isset($GENERALS_CONFIG[$genId])) {
+                echo json_encode(['success' => false, 'msg' => '该武将不存在']);
+                exit;
+            }
             $dup = $conn->query("SELECT p.uid, u.name FROM lolmtoj_room_players p
                 LEFT JOIN users u ON p.uid = u.uid WHERE p.room_id = $roomId AND p.general_id = $genId AND p.uid != $login_uid LIMIT 1")->fetch_assoc();
             if ($dup) {
@@ -713,6 +748,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
             'used_sajiao' => false,
             'used_tiaojiao' => false,
             'used_guanshui' => false,
+            'used_baolun' => false,
             'pending_response' => null,
             'discard' => [],
             'deck' => $deck,
@@ -1058,7 +1094,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
                     $oppUid = $resp['opponent_uid'];
                     $oppName = $resp['opponent_name'];
                     $state['pending_response'] = null;
-                    if ($myIdx !== -1) {
+                    if (!empty($resp['prevent_damage'])) {
+                        addLog($state, "<span style='color:#16a085;font-weight:bold;'>【暴论】</span> 防止了此伤害！");
+                    } elseif ($myIdx !== -1) {
                         applyDamage($state, $state['players'][$myIdx], 1, $oppUid, $oppName);
                     }
                 }
@@ -1146,7 +1184,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
                 }
             }
             addLog($state, "<strong>{$curr['name']}</strong> 弃置了 {$discardedCount} 张手牌");
-            nextTurn($state);
+            askZichao($state);
         } elseif ($subAction === 'skill_jijiang' && $state['phase'] === 'JIJIANG_SELECT' && $curr['uid'] === $login_uid) {
             $tIdx = getPlayerIndexByUid($state, $targetUid);
             if ($tIdx !== -1 && !$state['players'][$tIdx]['dead'] && $state['players'][$tIdx]['uid'] !== $curr['uid']) {
@@ -1325,6 +1363,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
                 addLog($state, "<span style='color:#3498db;font-weight:bold;'>【灌水】限定技</span> <strong>{$curr['name']}</strong> 获得了 " . count($chosen) . " 张手牌，弃置了场上其余 {$discardedTotal} 张手牌，回合直接结束（跳过弃牌阶段）！");
                 nextTurn($state);
             }
+        } elseif ($subAction === 'skill_baolun' && $isMyTurn && $state['phase'] === 'PLAY' && !$state['used_baolun'] && empty($state['pending_response']) && $curr['general']['name'] === 'zhoumurui') {
+            $trick = $_POST['trick'] ?? '';
+            if (!in_array($trick, ['无中生有', '顺手牵羊', '过河拆桥', '决斗'], true)) {
+                echo json_encode(['success' => false, 'msg' => '无效的锦囊牌']);
+                exit;
+            }
+            if (!isset($curr['hand'][$cardIdx]) || $curr['hand'][$cardIdx]['name'] !== '杀') {
+                echo json_encode(['success' => false, 'msg' => '请先选择一张【杀】']);
+                exit;
+            }
+            $tIdx = getPlayerIndexByUid($state, $targetUid);
+            if (in_array($trick, ['顺手牵羊', '过河拆桥', '决斗'], true) && ($tIdx === -1 || $state['players'][$tIdx]['dead'] || $state['players'][$tIdx]['uid'] === $curr['uid'])) {
+                echo json_encode(['success' => false, 'msg' => '请选择一名其他角色作为目标']);
+                exit;
+            }
+            if (in_array($trick, ['顺手牵羊', '过河拆桥'], true) && empty($state['players'][$tIdx]['hand'])) {
+                echo json_encode(['success' => false, 'msg' => '目标没有手牌']);
+                exit;
+            }
+            $state['used_baolun'] = true;
+            $card = array_splice($curr['hand'], $cardIdx, 1)[0];
+            $state['discard'][] = $card;
+            addLog($state, "<span style='color:#16a085;font-weight:bold;'>【暴论】</span> <strong>{$curr['name']}</strong> 将一张【杀】当做【{$trick}】使用！");
+            if ($trick === '无中生有') {
+                $drawn = drawCardsFromState($state, 2);
+                $curr['hand'] = array_merge($curr['hand'], $drawn);
+                addLog($state, "<strong>{$curr['name']}</strong> 摸了 2 张牌");
+            } elseif ($trick === '顺手牵羊') {
+                $stolen = array_pop($state['players'][$tIdx]['hand']);
+                $curr['hand'][] = $stolen;
+                addLog($state, "<strong>{$curr['name']}</strong> 顺走了 <strong>{$state['players'][$tIdx]['name']}</strong> 的一张手牌");
+            } elseif ($trick === '过河拆桥') {
+                $removed = array_pop($state['players'][$tIdx]['hand']);
+                $state['discard'][] = $removed;
+                addLog($state, "<strong>{$curr['name']}</strong> 拆掉了 <strong>{$state['players'][$tIdx]['name']}</strong> 的一张手牌");
+            } else {
+                addLog($state, "<strong>{$curr['name']}</strong> 对 <strong>{$state['players'][$tIdx]['name']}</strong> 发起了【决斗】（造成的伤害将被防止）！");
+                $state['pending_response'] = [
+                    'type' => 'duel_sha',
+                    'responder_uid' => $state['players'][$tIdx]['uid'],
+                    'responder_name' => $state['players'][$tIdx]['name'],
+                    'opponent_uid' => $curr['uid'],
+                    'opponent_name' => $curr['name'],
+                    'prevent_damage' => true
+                ];
+            }
+        } elseif ($subAction === 'respond_zichao_ask') {
+            $resp = $state['pending_response'];
+            if ($resp && $resp['type'] === 'zichao_ask' && (int)$resp['target_uid'] === $login_uid) {
+                $state['pending_response'] = null;
+                if ((bool) ($_POST['use'] ?? false)) {
+                    $myIdx = getPlayerIndexByUid($state, $login_uid);
+                    if ($myIdx !== -1 && !$state['players'][$myIdx]['dead']) {
+                        $drawn = 0;
+                        while (count($state['players'][$myIdx]['hand']) < (int)$resp['max_hand']) {
+                            $cards = drawCardsFromState($state, 1);
+                            if (empty($cards)) break;
+                            $state['players'][$myIdx]['hand'] = array_merge($state['players'][$myIdx]['hand'], $cards);
+                            $drawn++;
+                        }
+                        addLog($state, "<span style='color:#16a085;font-weight:bold;'>【自嘲】</span> <strong>{$state['players'][$myIdx]['name']}</strong> 从牌堆顶摸了 {$drawn} 张牌，手牌数达到 " . count($state['players'][$myIdx]['hand']) . " 张");
+                    }
+                }
+                nextTurn($state);
+            }
         } elseif ($subAction === 'play_card' && $isMyTurn && $state['phase'] === 'PLAY' && empty($state['pending_response'])) {
             if (isset($curr['hand'][$cardIdx])) {
                 $card = $curr['hand'][$cardIdx];
@@ -1392,7 +1495,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
                 $state['discard_needed'] = $needDiscard;
                 addLog($state, "<strong>{$curr['name']}</strong> 准备结束回合，需弃置 {$needDiscard} 张手牌");
             } else {
-                nextTurn($state);
+                askZichao($state);
             }
         }
 
@@ -1667,10 +1770,11 @@ let selectedCardIdx = null;
 let selectedDiscardIndices = [];
 let guanshuiPicks = [];
 let zhipaiPicks = [];
+let baolunTrick = null;
 let targetMode = null;
 let targetModePrompt = '';
 let _captcha_shown = false;
-const GENERALS_MAP = { 1: 'Ydch', 2: '六面体', 3: 'Gary0', 4: '小猫娘FR', 5: 'Rabo' };
+const GENERALS_MAP = { 1: 'Ydch', 2: '六面体', 3: 'Gary0', 4: '小猫娘FR', 5: 'Rabo', 7: 'zhoumurui' };
 
 function loadRooms() {
     fetch('/lolmtoj', {
@@ -1801,9 +1905,9 @@ function pickGeneral(gid) {
     }).then(r => r.json()).then(res => {
         if (res.success) {
             selectedGeneralId = gid;
-            for (let i = 1; i <= 5; i++) {
-                const el = document.getElementById(`g-opt-${i}`);
-                if (el) el.classList.toggle('active', i === gid);
+            for (const key of Object.keys(GENERALS_MAP)) {
+                const el = document.getElementById(`g-opt-${key}`);
+                if (el) el.classList.toggle('active', parseInt(key) === gid);
             }
         } else {
             alert(res.msg || '选择失败');
@@ -1914,8 +2018,9 @@ function renderWaitingRoom(data) {
         }
     });
 
-    for (let i = 1; i <= 5; i++) {
-        const el = document.getElementById(`g-opt-${i}`);
+    for (const key of Object.keys(GENERALS_MAP)) {
+        const i = parseInt(key);
+        const el = document.getElementById(`g-opt-${key}`);
         if (!el) continue;
         el.classList.toggle('active', selectedGeneralId === i);
         const oldBadge = el.querySelector('.gen-opt-occupied-badge');
@@ -2040,6 +2145,8 @@ function renderGame(state, isSpectator = false, room = {}) {
             statusText = `【灌水】<strong>${escapeHtml(state.pending_response.from_name)}</strong> 正在从场上手牌中挑选至多 4 张...`;
         } else if (state.pending_response.type === 'zhipai_arrange') {
             statusText = `【制牌】<strong>${escapeHtml(state.pending_response.from_name)}</strong> 正在排列 <strong>${escapeHtml(state.pending_response.target_name)}</strong> 的手牌...`;
+        } else if (state.pending_response.type === 'zichao_ask') {
+            statusText = `结束阶段：<strong>${escapeHtml(state.pending_response.target_name)}</strong> 可以发动【自嘲】（摸牌至 ${state.pending_response.max_hand} 张）...`;
         }
     } else if (state.phase === 'DISCARD') {
         statusText = `<strong>${currPlayer.name}</strong> 正在弃牌...`;
@@ -2061,6 +2168,16 @@ function renderGame(state, isSpectator = false, room = {}) {
                     <div>【泄密】锁定技：必须将一张手牌交给“信心”标记最多的 <strong>${escapeHtml(state.pending_response.target_name)}</strong>（已选 ${isCardChosen ? 1 : 0} / 1）：</div>
                     <div style="display:flex; gap:6px;">
                         <button class="btn btn-gold" ${!isCardChosen ? 'disabled' : ''} onclick="sendXiemiGive()">交出所选手牌</button>
+                    </div>
+                </div>
+            `;
+        } else if (state.pending_response && state.pending_response.type === 'zichao_ask' && state.pending_response.target_uid === myUid) {
+            promptArea.innerHTML = `
+                <div class="discard-prompt-banner">
+                    <div>结束阶段：是否发动【自嘲】？从牌堆顶重复摸牌，直到手牌数达到 <strong>${state.pending_response.max_hand}</strong> 张（除你以外手牌最多角色的手牌数，当前 ${my.hand.length} 张）：</div>
+                    <div style="display:flex; gap:6px;">
+                        <button class="btn btn-gold" onclick="sendZichaoResponse(true)">发动【自嘲】</button>
+                        <button class="btn btn-danger" onclick="sendZichaoResponse(false)">不发动</button>
                     </div>
                 </div>
             `;
@@ -2190,6 +2307,21 @@ function renderGame(state, isSpectator = false, room = {}) {
                     <button class="btn btn-danger" ${selectedDiscardIndices.length !== needed ? 'disabled' : ''} onclick="sendConfirmDiscard()">确认弃牌</button>
                 </div>
             `;
+        } else if (targetMode === 'BAOLUN_CHOOSE') {
+            const shaSelected = selectedCardIdx !== null && my.hand[selectedCardIdx] && my.hand[selectedCardIdx].name === '杀';
+            const trickBtn = (name, cls) => `<button class="btn btn-sm ${cls}" ${!shaSelected ? 'disabled' : ''} onclick="chooseBaolunTrick('${name}')">当做【${name}】</button>`;
+            promptArea.innerHTML = `
+                <div class="discard-prompt-banner">
+                    <div>【暴论】：${shaSelected ? `已选中 [${my.hand[selectedCardIdx].suit}${my.hand[selectedCardIdx].num} 杀]` : '先点击手牌选中一张【杀】'}，再选择将其当做哪张锦囊牌使用（造成的伤害将被防止）：</div>
+                    <div style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;">
+                        ${trickBtn('无中生有', 'btn-gold')}
+                        ${trickBtn('顺手牵羊', 'btn-info')}
+                        ${trickBtn('过河拆桥', 'btn-info')}
+                        ${trickBtn('决斗', 'btn-danger')}
+                        <button class="btn btn-sm" onclick="cancelTargetSelect()">取消</button>
+                    </div>
+                </div>
+            `;
         } else if (targetMode !== null) {
             promptArea.innerHTML = `
                 <div class="target-prompt-banner">
@@ -2204,8 +2336,9 @@ function renderGame(state, isSpectator = false, room = {}) {
     oppBox.innerHTML = '';
     state.players.forEach(p => {
         if (!isSpectator && p.uid === myUid) return;
-        let isTargetable = !isSpectator && targetMode !== null && !p.dead && !isGameFinished;
+        let isTargetable = !isSpectator && targetMode !== null && targetMode !== 'BAOLUN_CHOOSE' && !p.dead && !isGameFinished;
         if (targetMode === 'SKILL_ZHIPAI' && p.marks.ruiping <= 0) isTargetable = false;
+        if (targetMode === 'BAOLUN_TARGET' && (baolunTrick === '顺手牵羊' || baolunTrick === '过河拆桥') && !(p.hand_count > 0)) isTargetable = false;
 
         let div = document.createElement('div');
         div.className = `player-panel ${state.turn_index === state.players.indexOf(p) ? 'active-turn' : ''} ${isTargetable ? 'targetable' : ''} ${p.flipped ? 'flipped' : ''} ${p.dead ? 'dead' : ''}`;
@@ -2290,6 +2423,13 @@ function renderGame(state, isSpectator = false, room = {}) {
         b1.disabled = !canPlay || state.used_tiaojiao || extraTurnBlock;
         if (extraTurnBlock) b1.title = '【控制】的额外回合内无法使用【调教】';
         b1.onclick = () => { targetMode = 'SKILL_TIAOJIAO'; targetModePrompt = '【调教】：请选择一名角色获得一个“小猫梁”标记'; renderGame(state, isSpectator); };
+        btnBox.appendChild(b1);
+    } else if (my.general.name === 'zhoumurui') {
+        let b1 = document.createElement('button');
+        b1.className = 'btn btn-gold';
+        b1.innerText = '技能: 暴论';
+        b1.disabled = !canPlay || state.used_baolun || !my.hand.some(c => c.name === '杀');
+        b1.onclick = () => { targetMode = 'BAOLUN_CHOOSE'; renderGame(state, isSpectator); };
         btnBox.appendChild(b1);
     }
 
@@ -2376,6 +2516,7 @@ function cancelTargetSelect() {
     targetModePrompt = '';
     selectedCardIdx = null;
     selectedDiscardIndices = [];
+    baolunTrick = null;
     fetchStateAndRender();
 }
 
@@ -2397,16 +2538,37 @@ function onSelectTarget(targetUid) {
         sendAction('skill_jijiang', { target_uid: targetUid });
     } else if (targetMode === 'SKILL_TIAOJIAO') {
         sendAction('skill_tiaojiao', { target_uid: targetUid });
+    } else if (targetMode === 'BAOLUN_TARGET') {
+        sendAction('skill_baolun', { card_index: selectedCardIdx, target_uid: targetUid, trick: baolunTrick });
     }
     targetMode = null;
     targetModePrompt = '';
     selectedCardIdx = null;
+    baolunTrick = null;
 }
 
 function sendXiemiGive() {
     if (selectedCardIdx === null) return;
     sendAction('respond_xiemi_give', { card_index: selectedCardIdx });
     selectedCardIdx = null;
+}
+
+function sendZichaoResponse(use) {
+    sendAction('respond_zichao_ask', { use: use ? 1 : 0 });
+}
+
+function chooseBaolunTrick(trick) {
+    if (trick === '无中生有') {
+        if (selectedCardIdx === null) return;
+        sendAction('skill_baolun', { card_index: selectedCardIdx, target_uid: 0, trick: trick });
+        selectedCardIdx = null;
+        targetMode = null;
+        return;
+    }
+    baolunTrick = trick;
+    targetMode = 'BAOLUN_TARGET';
+    targetModePrompt = `【暴论】：点击选择一名目标，将【杀】当做【${trick}】使用`;
+    refreshRender();
 }
 
 function sendGuanshuiConfirm() {
