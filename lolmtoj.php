@@ -233,7 +233,27 @@ function generateDeck()
 		['name' => '过河拆桥', 'type' => 'trick', 'color' => 'black', 'suit' => '♣', 'num' => '4', 'count' => 2],
 		['name' => '决斗', 'type' => 'trick', 'color' => 'black', 'suit' => '♠', 'num' => 'A', 'count' => 2],
 		['name' => '决斗', 'type' => 'trick', 'color' => 'black', 'suit' => '♣', 'num' => 'A', 'count' => 2],
-		['name' => '决斗', 'type' => 'trick', 'color' => 'red', 'suit' => '♦', 'num' => 'A', 'count' => 1]
+		['name' => '决斗', 'type' => 'trick', 'color' => 'red', 'suit' => '♦', 'num' => 'A', 'count' => 1],
+		['name' => '万箭齐发', 'type' => 'trick', 'color' => 'red', 'suit' => '♥', 'num' => 'A', 'count' => 1],
+		['name' => '南蛮入侵', 'type' => 'trick', 'color' => 'black', 'suit' => '♠', 'num' => '7', 'count' => 2],
+		['name' => '南蛮入侵', 'type' => 'trick', 'color' => 'black', 'suit' => '♠', 'num' => 'K', 'count' => 1],
+		['name' => '南蛮入侵', 'type' => 'trick', 'color' => 'black', 'suit' => '♣', 'num' => '7', 'count' => 2],
+		['name' => '乐不思蜀', 'type' => 'trick', 'color' => 'red', 'suit' => '♥', 'num' => '6', 'count' => 1],
+		['name' => '乐不思蜀', 'type' => 'trick', 'color' => 'black', 'suit' => '♠', 'num' => '6', 'count' => 1],
+		['name' => '乐不思蜀', 'type' => 'trick', 'color' => 'black', 'suit' => '♣', 'num' => '6', 'count' => 1],
+		['name' => '兵粮寸断', 'type' => 'trick', 'color' => 'black', 'suit' => '♠', 'num' => '10', 'count' => 1],
+		['name' => '兵粮寸断', 'type' => 'trick', 'color' => 'black', 'suit' => '♣', 'num' => '10', 'count' => 1],
+		['name' => '寒冰剑', 'type' => 'equip', 'color' => 'black', 'suit' => '♠', 'num' => '2', 'count' => 1],
+		['name' => '青釭剑', 'type' => 'equip', 'color' => 'black', 'suit' => '♣', 'num' => '9', 'count' => 1],
+		['name' => '古锭刀', 'type' => 'equip', 'color' => 'black', 'suit' => '♠', 'num' => 'A', 'count' => 1],
+		['name' => '贯石斧', 'type' => 'equip', 'color' => 'red', 'suit' => '♦', 'num' => '5', 'count' => 1],
+		['name' => '诸葛连弩', 'type' => 'equip', 'color' => 'red', 'suit' => '♦', 'num' => 'A', 'count' => 1],
+		['name' => '诸葛连弩', 'type' => 'equip', 'color' => 'black', 'suit' => '♣', 'num' => 'A', 'count' => 1],
+		['name' => '青龙偃月刀', 'type' => 'equip', 'color' => 'black', 'suit' => '♠', 'num' => '5', 'count' => 1],
+		['name' => '丈八蛇矛', 'type' => 'equip', 'color' => 'black', 'suit' => '♠', 'num' => 'Q', 'count' => 1],
+		['name' => '八卦阵', 'type' => 'equip', 'color' => 'black', 'suit' => '♠', 'num' => '2', 'count' => 1],
+		['name' => '八卦阵', 'type' => 'equip', 'color' => 'black', 'suit' => '♣', 'num' => '2', 'count' => 1],
+		['name' => '仁王盾', 'type' => 'equip', 'color' => 'black', 'suit' => '♣', 'num' => '2', 'count' => 1]
 	];
 	foreach ($rawCards as $item) {
 		for ($i = 0; $i < $item['count']; $i++) {
@@ -288,6 +308,196 @@ function getPlayerIndexByUid($state, $uid)
 	return -1;
 }
 
+function getDistanceBetween(&$state, $fromUid, $toUid)
+{
+	$fromIdx = getPlayerIndexByUid($state, $fromUid);
+	$toIdx = getPlayerIndexByUid($state, $toUid);
+	if ($fromIdx === -1 || $toIdx === -1) return 99;
+	if ($fromIdx === $toIdx) return 0;
+	$n = count($state['players']);
+	$cw = 0;
+	$i = $fromIdx;
+	for ($step = 0; $step < $n; $step++) {
+		$i = ($i + 1) % $n;
+		if ($i === $fromIdx) break;
+		if (!$state['players'][$i]['dead']) $cw++;
+		if ($i === $toIdx) break;
+	}
+	$ccw = 0;
+	$i = $fromIdx;
+	for ($step = 0; $step < $n; $step++) {
+		$i = ($i - 1 + $n) % $n;
+		if ($i === $fromIdx) break;
+		if (!$state['players'][$i]['dead']) $ccw++;
+		if ($i === $toIdx) break;
+	}
+	return min($cw, $ccw);
+}
+
+function getAttackRange(&$state, $uid)
+{
+	$idx = getPlayerIndexByUid($state, $uid);
+	if ($idx === -1 || empty($state['players'][$idx]['equips'])) return 1;
+	$range = 1;
+	foreach ($state['players'][$idx]['equips'] as $e) {
+		$r = 0;
+		if ($e['name'] === '诸葛连弩') {
+			$r = 1;
+		} elseif (in_array($e['name'], ['寒冰剑', '青釭剑', '古锭刀'], true)) {
+			$r = 2;
+		} elseif (in_array($e['name'], ['贯石斧', '青龙偃月刀', '丈八蛇矛'], true)) {
+			$r = 3;
+		}
+		if ($r > $range) $range = $r;
+	}
+	return $range;
+}
+
+function inAttackRange(&$state, $fromUid, $toUid)
+{
+	if ((int)$fromUid === (int)$toUid) return false;
+	return getDistanceBetween($state, $fromUid, $toUid) <= getAttackRange($state, $fromUid);
+}
+
+function hasEquip(&$state, $uid, $name)
+{
+	$idx = getPlayerIndexByUid($state, $uid);
+	if ($idx === -1 || empty($state['players'][$idx]['equips'])) return false;
+	foreach ($state['players'][$idx]['equips'] as $e) {
+		if ($e['name'] === $name) return true;
+	}
+	return false;
+}
+
+function hasJudgeCard(&$state, $idx, $name)
+{
+	if (empty($state['players'][$idx]['judge_cards'])) return false;
+	foreach ($state['players'][$idx]['judge_cards'] as $jc) {
+		if ($jc['name'] === $name) return true;
+	}
+	return false;
+}
+
+function equipSlotOf($name)
+{
+	if (in_array($name, ['寒冰剑', '青釭剑', '古锭刀', '贯石斧', '诸葛连弩', '青龙偃月刀', '丈八蛇矛'], true)) return 'weapon';
+	if (in_array($name, ['八卦阵', '仁王盾'], true)) return 'armor';
+	return 'other';
+}
+
+function armorIgnored(&$state, $fromUid)
+{
+	return hasEquip($state, $fromUid, '青釭剑');
+}
+
+function addJudgment(&$state, $targetUid, $judgeType)
+{
+	$jCards = drawCardsFromState($state, 1);
+	if (empty($jCards)) return null;
+	$jc = $jCards[0];
+	$state['discard'][] = $jc;
+	$tIdx = getPlayerIndexByUid($state, $targetUid);
+	$tName = ($tIdx !== -1) ? $state['players'][$tIdx]['name'] : '角色';
+	$result = 'red';
+	if ($judgeType === 'leshu') {
+		$result = ($jc['color'] === 'red') ? 'red' : 'black';
+		addLog($state, "<span style='color:#8e44ad;font-weight:bold;'>【乐不思蜀】</span> <strong>{$tName}</strong> 判定为 [{$jc['suit']}{$jc['num']} {$jc['name']}]（" . ($result === 'red' ? '红色' : '黑色') . "）");
+	} else {
+		$result = ($jc['color'] === 'black') ? 'black' : 'red';
+		addLog($state, "<span style='color:#e67e22;font-weight:bold;'>【兵粮寸断】</span> <strong>{$tName}</strong> 判定为 [{$jc['suit']}{$jc['num']} {$jc['name']}]（" . ($result === 'black' ? '黑色' : '红色') . "）");
+	}
+	return $result;
+}
+
+function resolveSha(&$state, $fromUid, $toUid, $card)
+{
+	$fromIdx = getPlayerIndexByUid($state, $fromUid);
+	$toIdx = getPlayerIndexByUid($state, $toUid);
+	if ($fromIdx === -1 || $toIdx === -1 || $state['players'][$toIdx]['dead']) {
+		return;
+	}
+	$fromName = $state['players'][$fromIdx]['name'];
+	$toName = $state['players'][$toIdx]['name'];
+	if (!armorIgnored($state, $fromUid) && hasEquip($state, $toUid, '仁王盾') && $card['color'] === 'black') {
+		addLog($state, "<span style='color:#2ecc71;font-weight:bold;'>【仁王盾】</span> <strong>{$toName}</strong> 的【仁王盾】抵挡了黑色的【杀】！");
+		return;
+	}
+	addLog($state, "<strong>{$fromName}</strong> 对 <strong>{$toName}</strong> 使用了【杀】！等待其响应...");
+	$state['pending_response'] = [
+		'type' => 'respond_shan',
+		'from_uid' => $fromUid,
+		'from_name' => $fromName,
+		'target_uid' => $toUid,
+		'target_name' => $toName
+	];
+}
+
+function applyShaHit(&$state, $fromUid, $toUid)
+{
+	$toIdx = getPlayerIndexByUid($state, $toUid);
+	$fromIdx = getPlayerIndexByUid($state, $fromUid);
+	if ($toIdx === -1 || $fromIdx === -1 || $state['players'][$toIdx]['dead']) return;
+	$damage = 1;
+	if (hasEquip($state, $fromUid, '古锭刀') && empty($state['players'][$toIdx]['hand'])) {
+		$damage += 1;
+		addLog($state, "<span style='color:#e67e22;font-weight:bold;'>【古锭刀】</span> 目标无手牌，伤害 +1！");
+	}
+	$targetHasCards = !empty($state['players'][$toIdx]['hand']) || !empty($state['players'][$toIdx]['equips']) || !empty($state['players'][$toIdx]['judge_cards']);
+	if (hasEquip($state, $fromUid, '寒冰剑') && $targetHasCards) {
+		$state['pending_response'] = [
+			'type' => 'hanbing_choose',
+			'from_uid' => $fromUid,
+			'from_name' => $state['players'][$fromIdx]['name'],
+			'target_uid' => $toUid,
+			'target_name' => $state['players'][$toIdx]['name']
+		];
+		return;
+	}
+	applyDamage($state, $state['players'][$toIdx], $damage, $fromUid, $state['players'][$fromIdx]['name']);
+}
+
+function handleShaDodged(&$state, $resp)
+{
+	if (hasEquip($state, $resp['from_uid'], '贯石斧')) {
+		$fromIdx = getPlayerIndexByUid($state, $resp['from_uid']);
+		if ($fromIdx !== -1 && !$state['players'][$fromIdx]['dead'] && count($state['players'][$fromIdx]['hand']) >= 2) {
+			addLog($state, "<span style='color:#e67e22;font-weight:bold;'>【贯石斧】</span> <strong>{$resp['from_name']}</strong> 可以弃置 2 张手牌使此【杀】强制命中！");
+			$state['pending_response'] = [
+				'type' => 'guanshi_force',
+				'from_uid' => $resp['from_uid'],
+				'from_name' => $resp['from_name'],
+				'target_uid' => $resp['target_uid'],
+				'target_name' => $resp['target_name']
+			];
+			return;
+		}
+	}
+	if (hasEquip($state, $resp['from_uid'], '青龙偃月刀')) {
+		$fromIdx = getPlayerIndexByUid($state, $resp['from_uid']);
+		$hasSha = false;
+		if ($fromIdx !== -1 && !$state['players'][$fromIdx]['dead']) {
+			foreach ($state['players'][$fromIdx]['hand'] as $c) {
+				if ($c['name'] === '杀') {
+					$hasSha = true;
+					break;
+				}
+			}
+		}
+		if ($hasSha) {
+			addLog($state, "<span style='color:#e67e22;font-weight:bold;'>【青龙偃月刀】</span> <strong>{$resp['from_name']}</strong> 可以对 <strong>{$resp['target_name']}</strong> 再使用一张【杀】！");
+			$state['pending_response'] = [
+				'type' => 'qinglong_sha',
+				'from_uid' => $resp['from_uid'],
+				'from_name' => $resp['from_name'],
+				'target_uid' => $resp['target_uid'],
+				'target_name' => $resp['target_name']
+			];
+			return;
+		}
+	}
+	$state['pending_response'] = null;
+}
+
 function killPlayer(&$state, $playerIdx, $killerUid = null)
 {
 	if (!isset($state['players'][$playerIdx])) return;
@@ -299,6 +509,14 @@ function killPlayer(&$state, $playerIdx, $killerUid = null)
 		$state['discard'][] = $c;
 	}
 	$state['players'][$playerIdx]['hand'] = [];
+	foreach ($state['players'][$playerIdx]['equips'] as $c) {
+		$state['discard'][] = $c;
+	}
+	$state['players'][$playerIdx]['equips'] = [];
+	foreach ($state['players'][$playerIdx]['judge_cards'] as $c) {
+		$state['discard'][] = $c;
+	}
+	$state['players'][$playerIdx]['judge_cards'] = [];
 	if ($killerUid !== null) {
 		foreach ($state['players'] as $idx => $p) {
 			if ($p['uid'] == $killerUid && !$p['dead']) {
@@ -356,7 +574,7 @@ function saveGameRecords(&$state)
 
 function advanceAoeQueue(&$state)
 {
-	if (empty($state['pending_response']) || !in_array($state['pending_response']['type'], ['aoe_nanman', 'aoe_sajiao'])) {
+	if (empty($state['pending_response']) || !in_array($state['pending_response']['type'], ['aoe_nanman', 'aoe_wanjian', 'aoe_sajiao'])) {
 		return;
 	}
 	array_shift($state['pending_response']['targets']);
@@ -370,9 +588,9 @@ function advanceAoeQueue(&$state)
 		}
 	}
 	if (empty($state['pending_response']['targets'])) {
-		$aoeType = $state['pending_response']['type'];
+		$resumeDraw = !empty($state['pending_response']['resume_draw']);
 		$state['pending_response'] = null;
-		if ($aoeType === 'aoe_nanman') {
+		if ($resumeDraw) {
 			$currIdx = $state['turn_index'];
 			if (!$state['players'][$currIdx]['dead']) {
 				startDrawAndPlayPhase($state);
@@ -413,7 +631,7 @@ function checkDyingQueue(&$state)
 	if (!empty($state['suspended_response'])) {
 		$state['pending_response'] = $state['suspended_response'];
 		unset($state['suspended_response']);
-		if (in_array($state['pending_response']['type'], ['aoe_nanman', 'aoe_sajiao'])) {
+		if (in_array($state['pending_response']['type'], ['aoe_nanman', 'aoe_wanjian', 'aoe_sajiao'])) {
 			advanceAoeQueue($state);
 		}
 	}
@@ -497,7 +715,8 @@ function nextTurn(&$state)
 						'type' => 'aoe_nanman',
 						'from_uid' => $curr['uid'],
 						'from_name' => $curr['name'],
-						'targets' => $targets
+						'targets' => $targets,
+						'resume_draw' => true
 					];
 					return;
 				}
@@ -522,9 +741,46 @@ function nextTurn(&$state)
 function startDrawAndPlayPhase(&$state)
 {
 	$curr = &$state['players'][$state['turn_index']];
-	$drawn = drawCardsFromState($state, 2);
-	$curr['hand'] = array_merge($curr['hand'], $drawn);
-	addLog($state, "<strong>{$curr['name']}</strong> 摸了 2 张牌");
+	$skipPlay = false;
+	$skipDraw = false;
+	if (!empty($curr['judge_cards'])) {
+		$cards = $curr['judge_cards'];
+		$curr['judge_cards'] = [];
+		foreach ($cards as $jc) {
+			if ($jc['name'] === '乐不思蜀') {
+				if (addJudgment($state, $curr['uid'], 'leshu') !== 'red') {
+					$skipPlay = true;
+					addLog($state, "<span style='color:#8e44ad;font-weight:bold;'>【乐不思蜀】</span> <strong>{$curr['name']}</strong> 跳过本回合出牌阶段！");
+				} else {
+					addLog($state, "<strong>{$curr['name']}</strong> 的【乐不思蜀】判定为红色，生效失败");
+				}
+			} elseif ($jc['name'] === '兵粮寸断') {
+				if (addJudgment($state, $curr['uid'], 'bingliang') === 'black') {
+					$skipDraw = true;
+					addLog($state, "<span style='color:#e67e22;font-weight:bold;'>【兵粮寸断】</span> <strong>{$curr['name']}</strong> 跳过本回合摸牌阶段！");
+				} else {
+					addLog($state, "<strong>{$curr['name']}</strong> 的【兵粮寸断】判定为红色，生效失败");
+				}
+			}
+			$state['discard'][] = $jc;
+		}
+	}
+	if (!$skipDraw) {
+		$drawn = drawCardsFromState($state, 2);
+		$curr['hand'] = array_merge($curr['hand'], $drawn);
+		addLog($state, "<strong>{$curr['name']}</strong> 摸了 2 张牌");
+	}
+	if ($skipPlay) {
+		$needDiscard = count($curr['hand']) - $curr['hp'];
+		if ($needDiscard > 0) {
+			$state['phase'] = 'DISCARD';
+			$state['discard_needed'] = $needDiscard;
+			addLog($state, "<strong>{$curr['name']}</strong> 被【乐不思蜀】跳过出牌阶段，需弃置 {$needDiscard} 张手牌");
+		} else {
+			askZichao($state);
+		}
+		return;
+	}
 	$state['phase'] = 'PLAY';
 
 	if ($curr['general']['name'] === 'Ydch' && !$curr['dead'] && count($curr['hand']) > 0) {
@@ -778,6 +1034,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
 				'maxHp' => $gConfig['maxHp'],
 				'hand' => $hand,
 				'marks' => ['xinxin' => 0, 'ruiping' => 0, 'xiaomaoliang' => 0],
+				'equips' => [],
+				'judge_cards' => [],
 				'flipped' => false,
 				'dead' => false,
 				'kills' => 0,
@@ -1062,7 +1320,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
 						$shanCard = array_splice($state['players'][$myIdx]['hand'], $cardIdx, 1)[0];
 						$state['discard'][] = $shanCard;
 						addLog($state, "<strong>{$state['players'][$myIdx]['name']}</strong> 打出了【闪】，闪避了【杀】！");
-						$state['pending_response'] = null;
+						handleShaDodged($state, $resp);
 					} else {
 						echo json_encode(['success' => false, 'msg' => '请选择手牌中的【闪】']);
 						exit;
@@ -1070,10 +1328,142 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
 				} else {
 					$state['pending_response'] = null;
 					if ($myIdx !== -1) {
-						applyDamage($state, $state['players'][$myIdx], 1, $resp['from_uid'], $resp['from_name']);
+						applyShaHit($state, $resp['from_uid'], $resp['target_uid']);
 					}
 				}
 			}
+		} elseif ($subAction === 'respond_bagua') {
+			$resp = $state['pending_response'];
+			if ($resp && $resp['type'] === 'respond_shan' && $resp['target_uid'] === $login_uid && hasEquip($state, $login_uid, '八卦阵') && !armorIgnored($state, $resp['from_uid']) && empty($resp['bagua_used'])) {
+				$state['pending_response']['bagua_used'] = true;
+				$myIdx = getPlayerIndexByUid($state, $login_uid);
+				$jCards = drawCardsFromState($state, 1);
+				if (!empty($jCards)) {
+					$jc = $jCards[0];
+					$state['discard'][] = $jc;
+					$isRed = ($jc['color'] === 'red');
+					addLog($state, "<span style='color:#2ecc71;font-weight:bold;'>【八卦阵】</span> <strong>{$state['players'][$myIdx]['name']}</strong> 判定为 [{$jc['suit']}{$jc['num']} {$jc['name']}]（" . ($isRed ? '红色' : '黑色') . "）");
+					if ($isRed) {
+						addLog($state, "<strong>{$state['players'][$myIdx]['name']}</strong> 的【八卦阵】生效，视为打出了【闪】！");
+						handleShaDodged($state, $resp);
+					} else {
+						addLog($state, "<strong>{$state['players'][$myIdx]['name']}</strong> 的【八卦阵】判定为黑色，仍需打出【闪】！");
+					}
+				}
+			}
+		} elseif ($subAction === 'respond_qinglong_sha') {
+			$resp = $state['pending_response'];
+			if ($resp && $resp['type'] === 'qinglong_sha' && (int)$resp['from_uid'] === $login_uid) {
+				$useSha = (bool) ($_POST['use_sha'] ?? false);
+				if ($useSha) {
+					$fromIdx = getPlayerIndexByUid($state, $login_uid);
+					if ($fromIdx !== -1 && isset($state['players'][$fromIdx]['hand'][$cardIdx]) && $state['players'][$fromIdx]['hand'][$cardIdx]['name'] === '杀') {
+						$sha = array_splice($state['players'][$fromIdx]['hand'], $cardIdx, 1)[0];
+						$state['discard'][] = $sha;
+						$state['pending_response'] = null;
+						resolveSha($state, $resp['from_uid'], $resp['target_uid'], $sha);
+					} else {
+						echo json_encode(['success' => false, 'msg' => '请选择手牌中的【杀】']);
+						exit;
+					}
+				} else {
+					addLog($state, "<strong>{$resp['from_name']}</strong> 放弃再出【杀】");
+					$state['pending_response'] = null;
+				}
+			}
+		} elseif ($subAction === 'respond_guanshi_force') {
+			$resp = $state['pending_response'];
+			if ($resp && $resp['type'] === 'guanshi_force' && (int)$resp['from_uid'] === $login_uid) {
+				$state['pending_response'] = null;
+				$fromIdx = getPlayerIndexByUid($state, $login_uid);
+				$toIdx = getPlayerIndexByUid($state, $resp['target_uid']);
+				$use = (bool) ($_POST['use'] ?? false);
+				if ($use && $fromIdx !== -1 && $toIdx !== -1 && !$state['players'][$toIdx]['dead']) {
+					$indices = json_decode($_POST['card_indices'] ?? '[]', true);
+					if (!is_array($indices)) $indices = [];
+					$indices = array_values(array_unique(array_map('intval', $indices)));
+					if (count($indices) !== 2) {
+						echo json_encode(['success' => false, 'msg' => '请选择 2 张手牌弃置']);
+						exit;
+					}
+					rsort($indices);
+					$dropped = 0;
+					foreach ($indices as $idx) {
+						if (isset($state['players'][$fromIdx]['hand'][$idx])) {
+							$state['discard'][] = array_splice($state['players'][$fromIdx]['hand'], $idx, 1)[0];
+							$dropped++;
+						}
+					}
+					if ($dropped !== 2) {
+						echo json_encode(['success' => false, 'msg' => '请选择 2 张手牌弃置']);
+						exit;
+					}
+					addLog($state, "<span style='color:#e67e22;font-weight:bold;'>【贯石斧】</span> <strong>{$resp['from_name']}</strong> 弃置 2 张手牌，此【杀】强制命中！");
+					applyDamage($state, $state['players'][$toIdx], 1, $resp['from_uid'], $resp['from_name']);
+				} else {
+					addLog($state, "<strong>{$resp['from_name']}</strong> 放弃发动【贯石斧】");
+				}
+			}
+		} elseif ($subAction === 'respond_hanbing') {
+			$resp = $state['pending_response'];
+			if ($resp && $resp['type'] === 'hanbing_choose' && (int)$resp['from_uid'] === $login_uid) {
+				$state['pending_response'] = null;
+				$toIdx = getPlayerIndexByUid($state, $resp['target_uid']);
+				$useDiscard = (bool) ($_POST['use_discard'] ?? false);
+				if ($useDiscard && $toIdx !== -1 && !$state['players'][$toIdx]['dead']) {
+					$tp = &$state['players'][$toIdx];
+					$discarded = 0;
+					for ($k = 0; $k < 2; $k++) {
+						$taken = null;
+						if (!empty($tp['judge_cards'])) {
+							$taken = array_pop($tp['judge_cards']);
+						} elseif (!empty($tp['equips'])) {
+							$taken = array_pop($tp['equips']);
+						} elseif (!empty($tp['hand'])) {
+							$taken = array_pop($tp['hand']);
+						}
+						if ($taken !== null) {
+							$state['discard'][] = $taken;
+							$discarded++;
+						}
+					}
+					addLog($state, "<span style='color:#3498db;font-weight:bold;'>【寒冰剑】</span> <strong>{$resp['from_name']}</strong> 弃置了 <strong>{$resp['target_name']}</strong> 的 {$discarded} 张牌（不造成伤害）");
+				} else {
+					if ($toIdx !== -1 && !$state['players'][$toIdx]['dead']) {
+						applyDamage($state, $state['players'][$toIdx], 1, $resp['from_uid'], $resp['from_name']);
+					}
+				}
+			}
+		} elseif ($subAction === 'skill_zhangba' && $isMyTurn && $state['phase'] === 'PLAY' && empty($state['pending_response']) && hasEquip($state, $login_uid, '丈八蛇矛')) {
+			if ($state['used_sha_this_turn'] && !hasEquip($state, $login_uid, '诸葛连弩')) {
+				echo json_encode(['success' => false, 'msg' => '本回合已使用过【杀】']);
+				exit;
+			}
+			$tIdx = getPlayerIndexByUid($state, $targetUid);
+			if ($tIdx === -1 || $state['players'][$tIdx]['dead'] || $state['players'][$tIdx]['uid'] === $curr['uid']) {
+				echo json_encode(['success' => false, 'msg' => '请选择一名其他角色作为目标']);
+				exit;
+			}
+			if (!inAttackRange($state, $curr['uid'], $targetUid)) {
+				echo json_encode(['success' => false, 'msg' => '目标不在你的攻击范围内']);
+				exit;
+			}
+			$indices = json_decode($_POST['card_indices'] ?? '[]', true);
+			if (!is_array($indices)) $indices = [];
+			$indices = array_values(array_unique(array_map('intval', $indices)));
+			if (count($indices) !== 2 || !isset($curr['hand'][$indices[0]]) || !isset($curr['hand'][$indices[1]])) {
+				echo json_encode(['success' => false, 'msg' => '请选择 2 张手牌当做【杀】']);
+				exit;
+			}
+			rsort($indices);
+			$c1 = array_splice($curr['hand'], $indices[0], 1)[0];
+			$c2 = array_splice($curr['hand'], $indices[1], 1)[0];
+			$state['discard'][] = $c1;
+			$state['discard'][] = $c2;
+			$state['used_sha_this_turn'] = true;
+			addLog($state, "<span style='color:#e67e22;font-weight:bold;'>【丈八蛇矛】</span> <strong>{$curr['name']}</strong> 将 2 张手牌当做【杀】使用！");
+			$fakeSha = ['cid' => uniqid('c_'), 'name' => '杀', 'type' => 'basic', 'color' => 'red', 'suit' => '♠', 'num' => '0'];
+			resolveSha($state, $curr['uid'], $targetUid, $fakeSha);
 		} elseif ($subAction === 'respond_duel_sha') {
 			$resp = $state['pending_response'];
 			if ($resp && $resp['type'] === 'duel_sha' && $resp['responder_uid'] === $login_uid) {
@@ -1123,6 +1513,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
 					}
 				} else {
 					addLog($state, "<strong>{$state['players'][$myIdx]['name']}</strong> 未出【杀】，受到 1 点伤害！");
+					if ($myIdx !== -1) {
+						applyDamage($state, $state['players'][$myIdx], 1, $resp['from_uid'], $resp['from_name']);
+					}
+					advanceAoeQueue($state);
+				}
+			}
+		} elseif ($subAction === 'respond_aoe_wanjian') {
+			$resp = $state['pending_response'];
+			if ($resp && $resp['type'] === 'aoe_wanjian' && !empty($resp['targets']) && $resp['targets'][0] === $login_uid) {
+				$myIdx = getPlayerIndexByUid($state, $login_uid);
+				$useShan = (bool) ($_POST['use_shan'] ?? false);
+				if ($useShan) {
+					if ($myIdx !== -1 && isset($state['players'][$myIdx]['hand'][$cardIdx]) && $state['players'][$myIdx]['hand'][$cardIdx]['name'] === '闪') {
+						$shanCard = array_splice($state['players'][$myIdx]['hand'], $cardIdx, 1)[0];
+						$state['discard'][] = $shanCard;
+						addLog($state, "<strong>{$state['players'][$myIdx]['name']}</strong> 打出了【闪】响应【万箭齐发】");
+						advanceAoeQueue($state);
+					} else {
+						echo json_encode(['success' => false, 'msg' => '请选择手牌中的【闪】']);
+						exit;
+					}
+				} else {
+					addLog($state, "<strong>{$state['players'][$myIdx]['name']}</strong> 未出【闪】，受到 1 点伤害！");
 					if ($myIdx !== -1) {
 						applyDamage($state, $state['players'][$myIdx], 1, $resp['from_uid'], $resp['from_name']);
 					}
@@ -1435,7 +1848,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
 		} elseif ($subAction === 'play_card' && $isMyTurn && $state['phase'] === 'PLAY' && empty($state['pending_response'])) {
 			if (isset($curr['hand'][$cardIdx])) {
 				$card = $curr['hand'][$cardIdx];
-				if ($card['name'] === '杀' && $state['used_sha_this_turn']) {
+				if ($card['name'] === '杀' && $state['used_sha_this_turn'] && !hasEquip($state, $curr['uid'], '诸葛连弩')) {
 					echo json_encode(['success' => false, 'msg' => '本回合已使用过【杀】']);
 					exit;
 				}
@@ -1443,51 +1856,114 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
 					echo json_encode(['success' => false, 'msg' => '体力已满，无需使用【桃】']);
 					exit;
 				}
-				array_splice($curr['hand'], $cardIdx, 1);
-				$state['discard'][] = $card;
+				if (in_array($card['name'], ['杀', '顺手牵羊', '过河拆桥', '决斗', '乐不思蜀', '兵粮寸断'], true)) {
+					$tIdx = getPlayerIndexByUid($state, $targetUid);
+					if ($tIdx === -1 || $state['players'][$tIdx]['dead'] || $state['players'][$tIdx]['uid'] === $curr['uid']) {
+						echo json_encode(['success' => false, 'msg' => '请选择一名其他角色作为目标']);
+						exit;
+					}
+					if ($card['name'] === '杀' && !inAttackRange($state, $curr['uid'], $targetUid)) {
+						echo json_encode(['success' => false, 'msg' => '目标不在你的攻击范围内']);
+						exit;
+					}
+					if ($card['name'] === '顺手牵羊' && getDistanceBetween($state, $curr['uid'], $targetUid) > 1) {
+						echo json_encode(['success' => false, 'msg' => '目标不在你的距离 1 以内']);
+						exit;
+					}
+					if (in_array($card['name'], ['顺手牵羊', '过河拆桥'], true) && empty($state['players'][$tIdx]['hand']) && empty($state['players'][$tIdx]['equips']) && empty($state['players'][$tIdx]['judge_cards'])) {
+						echo json_encode(['success' => false, 'msg' => '目标没有可以拆顺的牌']);
+						exit;
+					}
+					if (in_array($card['name'], ['乐不思蜀', '兵粮寸断'], true) && hasJudgeCard($state, $tIdx, $card['name'])) {
+						echo json_encode(['success' => false, 'msg' => '目标判定区已有【' . $card['name'] . '】']);
+						exit;
+					}
+				}
+				$card = array_splice($curr['hand'], $cardIdx, 1)[0];
 
 				if ($card['name'] === '桃') {
+					$state['discard'][] = $card;
 					$curr['hp'] = min($curr['maxHp'], $curr['hp'] + 1);
 					addLog($state, "<strong>{$curr['name']}</strong> 使用了【桃】，恢复 1 点体力（当前HP: {$curr['hp']}/{$curr['maxHp']}）");
 				} elseif ($card['name'] === '无中生有') {
+					$state['discard'][] = $card;
 					$drawn = drawCardsFromState($state, 2);
 					$curr['hand'] = array_merge($curr['hand'], $drawn);
 					addLog($state, "<strong>{$curr['name']}</strong> 使用了【无中生有】，摸了 2 张牌");
 				} elseif ($card['name'] === '杀') {
 					$state['used_sha_this_turn'] = true;
+					$state['discard'][] = $card;
+					resolveSha($state, $curr['uid'], $targetUid, $card);
+				} elseif ($card['name'] === '决斗') {
+					$state['discard'][] = $card;
 					$tIdx = getPlayerIndexByUid($state, $targetUid);
-					if ($tIdx !== -1 && !$state['players'][$tIdx]['dead']) {
-						addLog($state, "<strong>{$curr['name']}</strong> 对 <strong>{$state['players'][$tIdx]['name']}</strong> 使用了【杀】！等待其响应...");
+					addLog($state, "<strong>{$curr['name']}</strong> 对 <strong>{$state['players'][$tIdx]['name']}</strong> 发起了【决斗】！");
+					$state['pending_response'] = [
+						'type' => 'duel_sha',
+						'responder_uid' => $state['players'][$tIdx]['uid'],
+						'responder_name' => $state['players'][$tIdx]['name'],
+						'opponent_uid' => $curr['uid'],
+						'opponent_name' => $curr['name']
+					];
+				} elseif ($card['name'] === '万箭齐发' || $card['name'] === '南蛮入侵') {
+					$state['discard'][] = $card;
+					$targets = [];
+					$pCount = count($state['players']);
+					for ($i = 1; $i < $pCount; $i++) {
+						$tt = ($state['turn_index'] + $i) % $pCount;
+						if (!$state['players'][$tt]['dead']) {
+							$targets[] = $state['players'][$tt]['uid'];
+						}
+					}
+					$aoeType = ($card['name'] === '万箭齐发') ? 'aoe_wanjian' : 'aoe_nanman';
+					addLog($state, "<strong>{$curr['name']}</strong> 使用了【{$card['name']}】！");
+					if (!empty($targets)) {
 						$state['pending_response'] = [
-							'type' => 'respond_shan',
+							'type' => $aoeType,
 							'from_uid' => $curr['uid'],
 							'from_name' => $curr['name'],
-							'target_uid' => $state['players'][$tIdx]['uid'],
-							'target_name' => $state['players'][$tIdx]['name']
+							'targets' => $targets
 						];
 					}
-				} elseif ($card['name'] === '决斗') {
+				} elseif ($card['name'] === '乐不思蜀' || $card['name'] === '兵粮寸断') {
 					$tIdx = getPlayerIndexByUid($state, $targetUid);
-					if ($tIdx !== -1 && !$state['players'][$tIdx]['dead']) {
-						addLog($state, "<strong>{$curr['name']}</strong> 对 <strong>{$state['players'][$tIdx]['name']}</strong> 发起了【决斗】！");
-						$state['pending_response'] = [
-							'type' => 'duel_sha',
-							'responder_uid' => $state['players'][$tIdx]['uid'],
-							'responder_name' => $state['players'][$tIdx]['name'],
-							'opponent_uid' => $curr['uid'],
-							'opponent_name' => $curr['name']
-						];
+					$state['players'][$tIdx]['judge_cards'][] = $card;
+					addLog($state, "<strong>{$curr['name']}</strong> 对 <strong>{$state['players'][$tIdx]['name']}</strong> 使用了【{$card['name']}】，将其置于其判定区");
+				} elseif ($card['type'] === 'equip') {
+					$slot = equipSlotOf($card['name']);
+					$oldIdx = -1;
+					foreach ($curr['equips'] as $ei => $e) {
+						if (equipSlotOf($e['name']) === $slot) {
+							$oldIdx = $ei;
+							break;
+						}
 					}
+					if ($oldIdx !== -1) {
+						$old = array_splice($curr['equips'], $oldIdx, 1)[0];
+						$state['discard'][] = $old;
+						addLog($state, "<strong>{$curr['name']}</strong> 替换了装备【{$old['name']}】");
+					}
+					$curr['equips'][] = $card;
+					addLog($state, "<strong>{$curr['name']}</strong> 装备了【{$card['name']}】");
 				} elseif ($card['name'] === '顺手牵羊' || $card['name'] === '过河拆桥') {
+					$state['discard'][] = $card;
 					$tIdx = getPlayerIndexByUid($state, $targetUid);
-					if ($tIdx !== -1 && !empty($state['players'][$tIdx]['hand'])) {
-						$stolen = array_pop($state['players'][$tIdx]['hand']);
+					$tp = &$state['players'][$tIdx];
+					$taken = null;
+					if (!empty($tp['judge_cards'])) {
+						$taken = array_pop($tp['judge_cards']);
+					} elseif (!empty($tp['equips'])) {
+						$taken = array_pop($tp['equips']);
+					} elseif (!empty($tp['hand'])) {
+						$taken = array_pop($tp['hand']);
+					}
+					if ($taken !== null) {
 						if ($card['name'] === '顺手牵羊') {
-							$curr['hand'][] = $stolen;
-							addLog($state, "<strong>{$curr['name']}</strong> 顺走了 <strong>{$state['players'][$tIdx]['name']}</strong> 的一张手牌");
+							$curr['hand'][] = $taken;
+							addLog($state, "<strong>{$curr['name']}</strong> 顺走了 <strong>{$tp['name']}</strong> 的 [{$taken['suit']}{$taken['num']} {$taken['name']}]");
 						} else {
-							$state['discard'][] = $stolen;
-							addLog($state, "<strong>{$curr['name']}</strong> 拆掉了 <strong>{$state['players'][$tIdx]['name']}</strong> 的一张手牌");
+							$state['discard'][] = $taken;
+							addLog($state, "<strong>{$curr['name']}</strong> 拆掉了 <strong>{$tp['name']}</strong> 的 [{$taken['suit']}{$taken['num']} {$taken['name']}]");
 						}
 					}
 				}
@@ -1735,7 +2211,7 @@ if (file_exists('navbar.php')) {
 				<div class="battle-center">
 					<div style="display:flex; flex-direction:column; justify-content:center; align-items:center;">
 						<div id="game-status-tip" style="color:#f1c40f; font-weight:bold; font-size:15px; margin-bottom:6px;">等待回合开始...</div>
-						<div style="font-size:12px; color:#aaa;">实时战场 (牌库: <span id="deck-count-num">0</span>张)</div>
+						<div style="font-size:12px; color:#aaa;">实时战场 (牌库: <span id="deck-count-num">0</span>张 | 我的攻击范围: <span id="my-attack-range">1</span>)</div>
 					</div>
 					<div class="logs-box" id="battle-logs-box"></div>
 				</div>
@@ -2083,6 +2559,7 @@ function renderGame(state, isSpectator = false, room = {}) {
 	}
 
 	document.getElementById('deck-count-num').innerText = state.deck ? state.deck.length : 0;
+	document.getElementById('my-attack-range').innerText = getAttackRangeJs(state, myUid);
 	document.getElementById('spectator-indicator').style.display = isSpectator ? 'block' : 'none';
 	document.getElementById('player-controls-wrap').style.display = (isSpectator || (my && my.dead) || isGameFinished) ? 'none' : 'flex';
 
@@ -2105,6 +2582,8 @@ function renderGame(state, isSpectator = false, room = {}) {
 				${my.marks.xinxin ? `<span class="mark-tag">信心 ×${my.marks.xinxin}</span>` : ''}
 				${my.marks.ruiping ? `<span class="mark-tag" style="background:#d35400;">瑞平 ×${my.marks.ruiping}</span>` : ''}
 				${my.marks.xiaomaoliang ? `<span class="mark-tag" style="background:#8e44ad;">小猫梁 ×${my.marks.xiaomaoliang}</span>` : ''}
+				${(my.equips || []).map(e => `<span class="mark-tag" style="background:#c59b27;">${escapeHtml(e.name)}</span>`).join('')}
+				${(my.judge_cards || []).map(j => `<span class="mark-tag" style="background:#8e44ad;">判定:${escapeHtml(j.name)}</span>`).join('')}
 				${my.flipped ? `<span class="mark-tag" style="background:#777;">已翻面 (跳过下回合)</span>` : ''}
 			</div>
 			<div class="skills-detail-box">
@@ -2136,11 +2615,22 @@ function renderGame(state, isSpectator = false, room = {}) {
 			const curTargetObj = state.players.find(p => p.uid === curTargetUid);
 			const curTargetName = curTargetObj ? curTargetObj.name : '玩家';
 			statusText = `【南蛮入侵】进行中！等待 <strong>${curTargetName}</strong> 响应【杀】...`;
+		} else if (state.pending_response.type === 'aoe_wanjian') {
+			const curTargetUid = state.pending_response.targets[0];
+			const curTargetObj = state.players.find(p => p.uid === curTargetUid);
+			const curTargetName = curTargetObj ? curTargetObj.name : '玩家';
+			statusText = `【万箭齐发】进行中！等待 <strong>${curTargetName}</strong> 响应【闪】...`;
 		} else if (state.pending_response.type === 'aoe_sajiao') {
 			const curTargetUid = state.pending_response.targets[0];
 			const curTargetObj = state.players.find(p => p.uid === curTargetUid);
 			const curTargetName = curTargetObj ? curTargetObj.name : '玩家';
 			statusText = `【撒娇】进行中！等待 <strong>${curTargetName}</strong> 弃置 2 张手牌或受到 1 点伤害...`;
+		} else if (state.pending_response.type === 'qinglong_sha') {
+			statusText = `【青龙偃月刀】等待 <strong>${escapeHtml(state.pending_response.from_name)}</strong> 决定是否再出【杀】...`;
+		} else if (state.pending_response.type === 'guanshi_force') {
+			statusText = `【贯石斧】等待 <strong>${escapeHtml(state.pending_response.from_name)}</strong> 决定是否弃 2 张牌强制命中...`;
+		} else if (state.pending_response.type === 'hanbing_choose') {
+			statusText = `【寒冰剑】等待 <strong>${escapeHtml(state.pending_response.from_name)}</strong> 决定造成伤害或弃置目标 2 张牌...`;
 		} else if (state.pending_response.type === 'ruiping_discard') {
 			statusText = `等待 <strong>${state.pending_response.target_name}</strong> 弃置 2 张手牌...`;
 		} else if (state.pending_response.type === 'xiemi_give') {
@@ -2205,16 +2695,51 @@ function renderGame(state, isSpectator = false, room = {}) {
 		} else if (state.pending_response && state.pending_response.type === 'respond_shan') {
 			if (state.pending_response.target_uid === myUid) {
 				let isCardShanSelected = selectedHandCard && selectedHandCard.name === '闪';
+				const fromPlayer = state.players.find(p => p.uid === state.pending_response.from_uid);
+				const armorIgnored = fromPlayer && (fromPlayer.equips || []).some(e => e.name === '青釭剑');
+				const hasBagua = (my.equips || []).some(e => e.name === '八卦阵') && !armorIgnored && !state.pending_response.bagua_used;
 				promptArea.innerHTML = `
 					<div class="respond-banner">
-						<div><strong>${state.pending_response.from_name}</strong> 对你使用了【杀】！请从手牌中选择一张【闪】打出：</div>
-						<div style="display:flex; gap:8px;">
+						<div><strong>${escapeHtml(state.pending_response.from_name)}</strong> 对你使用了【杀】！请从手牌中选择一张【闪】打出：</div>
+						<div style="display:flex; gap:8px; flex-wrap:wrap;">
 							<button class="btn btn-gold" ${!isCardShanSelected ? 'disabled' : ''} onclick="sendShanResponse(true)">${isCardShanSelected ? `打出[${selectedHandCard.suit}${selectedHandCard.num} 闪]` : '请选择一张【闪】'}</button>
+							${hasBagua ? `<button class="btn btn-info" onclick="sendBaguaResponse()">发动【八卦阵】判定</button>` : ''}
 							<button class="btn btn-danger" onclick="sendShanResponse(false)">不出 (受到1点伤害)</button>
 						</div>
 					</div>
 				`;
 			}
+		} else if (state.pending_response && state.pending_response.type === 'qinglong_sha' && state.pending_response.from_uid === myUid) {
+			const isCardShaSelected = selectedHandCard && selectedHandCard.name === '杀';
+			promptArea.innerHTML = `
+				<div class="respond-banner">
+					<div>【青龙偃月刀】你可以对 <strong>${escapeHtml(state.pending_response.target_name)}</strong> 再使用一张【杀】：</div>
+					<div style="display:flex; gap:8px;">
+						<button class="btn btn-gold" ${!isCardShaSelected ? 'disabled' : ''} onclick="sendQinglongResponse(true)">${isCardShaSelected ? `再出[${selectedHandCard.suit}${selectedHandCard.num} 杀]` : '请选择一张【杀】'}</button>
+						<button class="btn btn-danger" onclick="sendQinglongResponse(false)">放弃</button>
+					</div>
+				</div>
+			`;
+		} else if (state.pending_response && state.pending_response.type === 'guanshi_force' && state.pending_response.from_uid === myUid) {
+			promptArea.innerHTML = `
+				<div class="discard-prompt-banner">
+					<div>【贯石斧】弃置 <strong>2</strong> 张手牌，使【杀】对 <strong>${escapeHtml(state.pending_response.target_name)}</strong> 强制命中（已选 ${selectedDiscardIndices.length} / 2）：</div>
+					<div style="display:flex; gap:6px;">
+						<button class="btn btn-gold" ${selectedDiscardIndices.length !== 2 ? 'disabled' : ''} onclick="sendGuanshiResponse(true)">弃 2 张强制命中</button>
+						<button class="btn btn-danger" onclick="sendGuanshiResponse(false)">放弃</button>
+					</div>
+				</div>
+			`;
+		} else if (state.pending_response && state.pending_response.type === 'hanbing_choose' && state.pending_response.from_uid === myUid) {
+			promptArea.innerHTML = `
+				<div class="respond-banner">
+					<div>【寒冰剑】对 <strong>${escapeHtml(state.pending_response.target_name)}</strong> 造成伤害，或改为弃置其 2 张牌？</div>
+					<div style="display:flex; gap:8px;">
+						<button class="btn btn-gold" onclick="sendHanbingResponse(true)">弃置其 2 张牌</button>
+						<button class="btn btn-danger" onclick="sendHanbingResponse(false)">造成伤害</button>
+					</div>
+				</div>
+			`;
 		} else if (state.pending_response && state.pending_response.type === 'duel_sha') {
 			if (state.pending_response.responder_uid === myUid) {
 				let isCardShaSelected = selectedHandCard && selectedHandCard.name === '杀';
@@ -2233,10 +2758,23 @@ function renderGame(state, isSpectator = false, room = {}) {
 				let isCardShaSelected = selectedHandCard && selectedHandCard.name === '杀';
 				promptArea.innerHTML = `
 					<div class="respond-banner">
-						<div><strong>${state.pending_response.from_name}</strong> 发动了【南蛮入侵】！请选择一张【杀】响应：</div>
+						<div><strong>${escapeHtml(state.pending_response.from_name)}</strong> 发动了【南蛮入侵】！请选择一张【杀】响应：</div>
 						<div style="display:flex; gap:8px;">
 							<button class="btn btn-gold" ${!isCardShaSelected ? 'disabled' : ''} onclick="sendAoeNanmanResponse(true)">${isCardShaSelected ? `打出[${selectedHandCard.suit}${selectedHandCard.num} 杀]` : '请选择一张【杀】'}</button>
 							<button class="btn btn-danger" onclick="sendAoeNanmanResponse(false)">不出 (受到1点伤害)</button>
+						</div>
+					</div>
+				`;
+			}
+		} else if (state.pending_response && state.pending_response.type === 'aoe_wanjian') {
+			if (state.pending_response.targets.length > 0 && state.pending_response.targets[0] === myUid) {
+				let isCardShanSelected = selectedHandCard && selectedHandCard.name === '闪';
+				promptArea.innerHTML = `
+					<div class="respond-banner">
+						<div><strong>${escapeHtml(state.pending_response.from_name)}</strong> 发动了【万箭齐发】！请选择一张【闪】响应：</div>
+						<div style="display:flex; gap:8px;">
+							<button class="btn btn-gold" ${!isCardShanSelected ? 'disabled' : ''} onclick="sendAoeWanjianResponse(true)">${isCardShanSelected ? `打出[${selectedHandCard.suit}${selectedHandCard.num} 闪]` : '请选择一张【闪】'}</button>
+							<button class="btn btn-danger" onclick="sendAoeWanjianResponse(false)">不出 (受到1点伤害)</button>
 						</div>
 					</div>
 				`;
@@ -2326,6 +2864,15 @@ function renderGame(state, isSpectator = false, room = {}) {
 					</div>
 				</div>
 			`;
+		} else if (targetMode === 'ZHANGBA') {
+			promptArea.innerHTML = `
+				<div class="discard-prompt-banner">
+					<div>【丈八蛇矛】：勾选 <strong>2</strong> 张手牌当做【杀】（已选 ${selectedDiscardIndices.length} / 2），再点击上方高亮目标：</div>
+					<div style="display:flex; gap:6px;">
+						<button class="btn btn-danger btn-sm" onclick="cancelTargetSelect()">取消</button>
+					</div>
+				</div>
+			`;
 		} else if (targetMode !== null) {
 			promptArea.innerHTML = `
 				<div class="target-prompt-banner">
@@ -2355,11 +2902,13 @@ function renderGame(state, isSpectator = false, room = {}) {
 			<div class="player-info">
 				<div>
 					<strong style="color:#f5d76e; font-size:13px;">${escapeHtml(p.name)}</strong> <span style="font-size:11px; color:#aaa;">(${p.general.name})</span>
-					<div class="p-hp">HP: ${p.hp} / ${p.maxHp}</div>
+					<div class="p-hp">HP: ${p.hp} / ${p.maxHp}${!isSpectator && my ? ` | 距你 ${getDistanceJs(state, myUid, p.uid)}` : ''}</div>
 					<div class="p-marks">
 						${p.marks.xinxin ? `<span class="mark-tag">信心 ×${p.marks.xinxin}</span>` : ''}
 						${p.marks.ruiping ? `<span class="mark-tag" style="background:#d35400;">瑞平 ×${p.marks.ruiping}</span>` : ''}
 						${p.marks.xiaomaoliang ? `<span class="mark-tag" style="background:#8e44ad;">小猫梁 ×${p.marks.xiaomaoliang}</span>` : ''}
+						${(p.equips || []).map(e => `<span class="mark-tag" style="background:#c59b27;">${escapeHtml(e.name)}</span>`).join('')}
+						${(p.judge_cards || []).map(j => `<span class="mark-tag" style="background:#8e44ad;">判定:${escapeHtml(j.name)}</span>`).join('')}
 						${p.flipped ? `<span class="mark-tag" style="background:#666;">已翻面</span>` : ''}
 					</div>
 				</div>
@@ -2376,7 +2925,8 @@ function renderGame(state, isSpectator = false, room = {}) {
 
 	let isSelectedSha = (selectedCardIdx !== null && my.hand[selectedCardIdx] && my.hand[selectedCardIdx].name === '杀');
 	let isSelectedPeach = (selectedCardIdx !== null && my.hand[selectedCardIdx] && my.hand[selectedCardIdx].name === '桃');
-	let canPlayThisCard = canPlay && !(isSelectedSha && state.used_sha_this_turn) && !(isSelectedPeach && my.hp >= my.maxHp);
+	const hasLiannu = (my.equips || []).some(e => e.name === '诸葛连弩');
+	let canPlayThisCard = canPlay && !(isSelectedSha && state.used_sha_this_turn && !hasLiannu) && !(isSelectedPeach && my.hp >= my.maxHp);
 
 	document.getElementById('btn-play').disabled = !canPlayThisCard;
 	document.getElementById('btn-end').disabled = !canPlay;
@@ -2437,9 +2987,21 @@ function renderGame(state, isSpectator = false, room = {}) {
 		btnBox.appendChild(b1);
 	}
 
+	if ((my.equips || []).some(e => e.name === '丈八蛇矛')) {
+		let bz = document.createElement('button');
+		bz.className = 'btn btn-gold';
+		bz.innerText = '丈八蛇矛';
+		bz.disabled = !canPlay || my.hand.length < 2 || (state.used_sha_this_turn && !hasLiannu);
+		bz.title = '将两张手牌当做【杀】使用';
+		bz.onclick = () => { targetMode = 'ZHANGBA'; selectedDiscardIndices = []; targetModePrompt = '【丈八蛇矛】：先勾选 2 张手牌，再点击目标（将其当做【杀】使用）'; renderGame(state, isSpectator); };
+		btnBox.appendChild(bz);
+	}
+
 	const isDiscardMode = (state.phase === 'DISCARD' && isMyTurn) ||
 		(state.pending_response && state.pending_response.type === 'ruiping_discard' && state.pending_response.target_uid === myUid) ||
-		(state.pending_response && state.pending_response.type === 'aoe_sajiao' && state.pending_response.targets.length > 0 && state.pending_response.targets[0] === myUid);
+		(state.pending_response && state.pending_response.type === 'aoe_sajiao' && state.pending_response.targets.length > 0 && state.pending_response.targets[0] === myUid) ||
+		(state.pending_response && state.pending_response.type === 'guanshi_force' && state.pending_response.from_uid === myUid) ||
+		(targetMode === 'ZHANGBA');
 
 	const handBox = document.getElementById('my-handcards');
 	handBox.innerHTML = '';
@@ -2469,7 +3031,7 @@ function renderGame(state, isSpectator = false, room = {}) {
 				<span>${c.suit}</span><span>${c.num}</span>
 			</div>
 			<div style="text-align:center; font-weight:bold; font-size:13px; margin:auto 0;">${c.name}</div>
-			<div style="text-align:right; font-size:9px; color:#888;">${c.type === 'basic' ? '基本' : '锦囊'}</div>
+			<div style="text-align:right; font-size:9px; color:#888;">${c.type === 'basic' ? '基本' : (c.type === 'equip' ? '装备' : '锦囊')}</div>
 		`;
 		handBox.appendChild(el);
 	});
@@ -2505,7 +3067,7 @@ function onPlayCard() {
 	if (!my) return;
 	const card = my.hand[selectedCardIdx];
 	if (!card) return;
-	if (card.name === '桃' || card.name === '无中生有') {
+	if (card.name === '桃' || card.name === '无中生有' || card.name === '万箭齐发' || card.name === '南蛮入侵' || card.type === 'equip') {
 		sendAction('play_card', { target_uid: 0, card_index: selectedCardIdx });
 		selectedCardIdx = null;
 		return;
@@ -2544,6 +3106,10 @@ function onSelectTarget(targetUid) {
 		sendAction('skill_tiaojiao', { target_uid: targetUid });
 	} else if (targetMode === 'BAOLUN_TARGET') {
 		sendAction('skill_baolun', { card_index: selectedCardIdx, target_uid: targetUid, trick: baolunTrick });
+	} else if (targetMode === 'ZHANGBA') {
+		if (selectedDiscardIndices.length !== 2) { alert('请先勾选 2 张手牌当做【杀】'); return; }
+		sendAction('skill_zhangba', { target_uid: targetUid, card_indices: JSON.stringify(selectedDiscardIndices) });
+		selectedDiscardIndices = [];
 	}
 	targetMode = null;
 	targetModePrompt = '';
@@ -2613,6 +3179,24 @@ function sendShanResponse(useShan) {
 	selectedCardIdx = null;
 }
 
+function sendBaguaResponse() {
+	sendAction('respond_bagua', {});
+}
+
+function sendQinglongResponse(useSha) {
+	sendAction('respond_qinglong_sha', { use_sha: useSha ? 1 : 0, card_index: selectedCardIdx !== null ? selectedCardIdx : -1 });
+	selectedCardIdx = null;
+}
+
+function sendGuanshiResponse(use) {
+	sendAction('respond_guanshi_force', { use: use ? 1 : 0, card_indices: JSON.stringify(selectedDiscardIndices) });
+	selectedDiscardIndices = [];
+}
+
+function sendHanbingResponse(useDiscard) {
+	sendAction('respond_hanbing', { use_discard: useDiscard ? 1 : 0 });
+}
+
 function sendDuelShaResponse(useSha) {
 	sendAction('respond_duel_sha', { use_sha: useSha ? 1 : 0, card_index: selectedCardIdx !== null ? selectedCardIdx : -1 });
 	selectedCardIdx = null;
@@ -2620,6 +3204,11 @@ function sendDuelShaResponse(useSha) {
 
 function sendAoeNanmanResponse(useSha) {
 	sendAction('respond_aoe_nanman', { use_sha: useSha ? 1 : 0, card_index: selectedCardIdx !== null ? selectedCardIdx : -1 });
+	selectedCardIdx = null;
+}
+
+function sendAoeWanjianResponse(useShan) {
+	sendAction('respond_aoe_wanjian', { use_shan: useShan ? 1 : 0, card_index: selectedCardIdx !== null ? selectedCardIdx : -1 });
 	selectedCardIdx = null;
 }
 
@@ -2663,6 +3252,44 @@ function fetchStateAndRender() {
 			renderGame(data.game_state, !!data.is_spectator, data.room);
 		}
 	});
+}
+
+function getDistanceJs(state, fromUid, toUid) {
+	const players = state.players;
+	const fromIdx = players.findIndex(p => p.uid === fromUid);
+	const toIdx = players.findIndex(p => p.uid === toUid);
+	if (fromIdx < 0 || toIdx < 0) return 99;
+	if (fromIdx === toIdx) return 0;
+	const n = players.length;
+	let cw = 0;
+	for (let s = 0, i = fromIdx; s < n; s++) {
+		i = (i + 1) % n;
+		if (i === fromIdx) break;
+		if (!players[i].dead) cw++;
+		if (i === toIdx) break;
+	}
+	let ccw = 0;
+	for (let s = 0, i = fromIdx; s < n; s++) {
+		i = (i - 1 + n) % n;
+		if (i === fromIdx) break;
+		if (!players[i].dead) ccw++;
+		if (i === toIdx) break;
+	}
+	return Math.min(cw, ccw);
+}
+
+function getAttackRangeJs(state, uid) {
+	const p = state.players.find(x => x.uid === uid);
+	if (!p || !p.equips) return 1;
+	let range = 1;
+	p.equips.forEach(e => {
+		let r = 0;
+		if (e.name === '诸葛连弩') r = 1;
+		else if (['寒冰剑', '青釭剑', '古锭刀'].includes(e.name)) r = 2;
+		else if (['贯石斧', '青龙偃月刀', '丈八蛇矛'].includes(e.name)) r = 3;
+		if (r > range) range = r;
+	});
+	return range;
 }
 
 function escapeHtml(str) {
