@@ -597,7 +597,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
 
 	if ($api === 'create_room') {
 		$title = trim($_POST['title'] ?? '') ?: ($login_name . '的对局');
-		$max_p = max(2, min(4, (int) ($_POST['max_players'] ?? 4)));
+		$max_p = max(2, min(6, (int) ($_POST['max_players'] ?? 6)));
 		$code = substr(md5(uniqid(mt_rand(), true)), 0, 8);
 		$stmt = $conn->prepare("INSERT INTO lolmtoj_rooms (room_code, host_uid, title, max_players, status, version) VALUES (?, ?, ?, ?, 'waiting', 1)");
 		$stmt->bind_param("sisi", $code, $login_uid, $title, $max_p);
@@ -649,7 +649,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
 	if ($api === 'leave_room') {
 		$roomId = (int) $_POST['room_id'];
 		$room = $conn->query("SELECT * FROM lolmtoj_rooms WHERE id = $roomId LIMIT 1")->fetch_assoc();
-		if ($room && $room['status'] === 'playing') {
+		if ($room && $room['status'] !== 'waiting') {
 			$state = json_decode($room['game_state'] ?? '{}', true);
 			if (!empty($state['players'])) {
 				foreach ($state['players'] as $p) {
@@ -660,7 +660,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
 				}
 				foreach ($state['players'] as $p) {
 					if ($p['uid'] == $login_uid) {
-						echo json_encode(['success' => false, 'msg' => '游戏中无法退出房间']);
+						echo json_encode(['success' => false, 'msg' => '已开始，无法退出房间']);
 						exit;
 					}
 				}
@@ -1818,8 +1818,8 @@ function loadRooms() {
 function openCreateModal() {
 	let title = prompt("请输入房间名称：", "小猫娘FR好可爱");
 	if (!title) return;
-	let maxP = prompt("请输入房间人数 (2-4)：", "4");
-	if (!maxP) maxP = 4;
+	let maxP = prompt("请输入房间人数 (2-6)：", "6");
+	if (!maxP) maxP = 6;
 	fetch('/lolmtoj', {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
