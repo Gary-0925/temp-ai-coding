@@ -43,6 +43,10 @@ export class PpermProcess extends EventTarget {
 	#terminated = false;
 	#pending = new Map();
 	#nextId = 0;
+	#domNodes = new Map();
+	#domNodeIds = new WeakMap();
+	#nextDomNodeId = 0;
+	#domListeners = new Map();
 
 	constructor(permissions = {}) {
 		super();
@@ -111,20 +115,65 @@ export class PpermProcess extends EventTarget {
 			}
 
 			const root = document.querySelector(this.permissions.dom.root);
+			if (!root) throw new Error("DOM root not found: " + this.permissions.dom.root);
 
-			if (!root) {
-				throw new Error(`DOM root not found: ${this.permissions.dom.root}`);
-			}
+			const nodeId = node => {
+				let id = this.#domNodeIds.get(node);
+				if (!id) {
+					id = ++this.#nextDomNodeId;
+					this.#domNodeIds.set(node, id);
+					this.#domNodes.set(id, node);
+				}
+				return id;
+			};
+
+			const allowedNode = node => node && (
+				node === root ||
+				root.contains(node) ||
+				this.#domNodes.has(this.#domNodeIds.get(node))
+			);
+
+			const serialize = value => {
+				if (value instanceof Node) {
+					if (!allowedNode(value)) return null;
+					return {
+						__ppermNode: true,
+						nodeId: nodeId(value),
+						nodeType: value.nodeType,
+						nodeName: value.nodeName,
+						tagName: value.tagName ?? null
+					};
+				}
+				if (value instanceof NodeList || value instanceof HTMLCollection) {
+					return Array.from(value, serialize);
+				}
+				if (Array.isArray(value)) return value.map(serialize);
+				if (value && Object.getPrototypeOf(value) === Object.prototype) {
+					return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, serialize(item)]));
+				}
+				return value;
+			};
+
+			const deserialize = value => {
+				if (value && value.__ppermNode === true && Number.isInteger(value.nodeId)) {
+					const node = this.#domNodes.get(value.nodeId);
+					if (!node || !allowedNode(node)) throw new DOMException("DOM node is outside the permitted root", "NotAllowedError");
+					return node;
+				}
+				if (Array.isArray(value)) return value.map(deserialize);
+				return value;
+			};
 
 			const resolveTarget = reference => {
 				if (!reference) return root;
-				if (reference.nodeType === "root") return root;
-
-				const parent = reference.parent ? resolveTarget(reference.parent) : root;
-				if (!parent) return null;
-				if (Number.isInteger(reference.index)) {
-					return parent.querySelectorAll(reference.selector)[reference.index] ?? null;
+				if (reference.nodeId) {
+					const node = this.#domNodes.get(reference.nodeId);
+					return allowedNode(node) ? node : null;
 				}
+				if (reference.nodeType === "root") return root;
+				const parent = reference.parent ? resolveTarget(reference.parent) : root;
+				if (!parent || typeof parent.querySelector !== "function") return null;
+				if (Number.isInteger(reference.index)) return parent.querySelectorAll(reference.selector)[reference.index] ?? null;
 				return parent.querySelector(reference.selector) ?? null;
 			};
 
@@ -136,56 +185,97 @@ export class PpermProcess extends EventTarget {
 				case "get":
 					if (!target) throw new Error("DOM element not found");
 					value = target[args.property];
-					if (value instanceof Node) {
-						throw new Error("DOM node values are not directly transferable");
-					}
+					if (typeof value === "function") value = { __ppermMethod: true, name: args.property };
+					else value = serialize(value);
 					break;
 				case "set":
 					if (!target) throw new Error("DOM element not found");
-					if (args.property === "outerHTML" || args.property === "ownerDocument") {
+					if (["outerHTML", "ownerDocument", "parentNode", "parentElement"].includes(args.property)) {
 						throw new DOMException("This DOM property is not permitted", "NotAllowedError");
 					}
-					target[args.property] = args.value;
+					target[args.property] = deserialize(args.value);
 					value = true;
 					break;
 				case "style-get":
-					if (!target) throw new Error("DOM element not found");
+					if (!target || !target.style) throw new Error("DOM element not found");
 					value = target.style[args.property];
 					break;
 				case "style-set":
-					if (!target) throw new Error("DOM element not found");
-					target.style[args.property] = args.value;
+					if (!target || !target.style) throw new Error("DOM element not found");
+					target.style[args.property] = String(args.value);
 					value = true;
 					break;
 				case "querySelectorAll":
-					value = Array.from((target ?? root).querySelectorAll(args.selector), (element, index) => {
-						const parentRef = data.target ?? null;
-						return {
-							parent: parentRef,
-							selector: args.selector,
-							index
-						};
-					});
+					if (!target || typeof target.querySelectorAll !== "function") throw new Error("DOM element not found");
+					value = Array.from(target.querySelectorAll(args.selector), node => serialize(node));
+					break;
+				case "createElement":
+					value = serialize(document.createElement(String(args.tagName)));
+					break;
+				case "createTextNode":
+					value = serialize(document.createTextNode(String(args.text)));
 					break;
 				case "call": {
 					if (!target) throw new Error("DOM element not found");
 					const method = target[args.method];
-					if (typeof method !== "function") throw new Error(`Unknown DOM method: ${args.method}`);
-					const result = method.apply(target, args.args ?? []);
-					value = result instanceof Node ? null : result;
+					if (typeof method !== "function") throw new Error("Unknown DOM method: " + args.method);
+					const result = method.apply(target, deserialize(args.args ?? []));
+					value = result instanceof Node ? serialize(result) : serialize(result);
 					break;
 				}
 				case "classList":
-					if (!target) throw new Error("DOM element not found");
+					if (!target || !target.classList) throw new Error("DOM element not found");
 					value = target.classList[args.method](...(args.args ?? []));
 					break;
+				case "event-listener-add": {
+					if (!target || typeof target.addEventListener !== "function") throw new Error("DOM element not found");
+					const key = String(args.listenerId);
+					const listenerKey = nodeId(target) + ":" + key;
+					const listener = event => {
+						const eventData = {
+							type: event.type,
+							bubbles: event.bubbles,
+							cancelable: event.cancelable,
+							defaultPrevented: event.defaultPrevented,
+							timeStamp: event.timeStamp,
+							detail: serialize(event.detail),
+							key: event.key,
+							code: event.code,
+							repeat: event.repeat,
+							button: event.button,
+							buttons: event.buttons,
+							clientX: event.clientX,
+							clientY: event.clientY,
+							target: serialize(event.target),
+							currentTarget: serialize(event.currentTarget)
+						};
+						this.#worker.postMessage({ type: "dom-event", listenerId: args.listenerId, event: eventData });
+					};
+					target.addEventListener(args.eventType, listener, args.options);
+					this.#domListeners.set(listenerKey, { target, eventType: args.eventType, listener, options: args.options });
+					value = true;
+					break;
+				}
+				case "event-listener-remove": {
+					const key = String(args.listenerId);
+					for (const [listenerKey, entry] of this.#domListeners) {
+						if (listenerKey.endsWith(":" + key) && entry.eventType === args.eventType && target) {
+							entry.target.removeEventListener(entry.eventType, entry.listener, entry.options);
+							this.#domListeners.delete(listenerKey);
+						}
+					}
+					value = true;
+					break;
+				}
 				case "document-get":
 					if (args.property === "title") value = document.title;
 					else if (args.property === "URL" || args.property === "documentURI") value = location.href;
+					else if (args.property === "readyState") value = document.readyState;
+					else if (args.property === "visibilityState") value = document.visibilityState;
 					else value = undefined;
 					break;
 				default:
-					throw new Error(`Unsupported DOM operation: ${data.operation}`);
+					throw new Error("Unsupported DOM operation: " + data.operation);
 			}
 
 			reply({ value });
@@ -196,7 +286,6 @@ export class PpermProcess extends EventTarget {
 			} });
 		}
 	}
-
 	run(code) {
 		if (this.#terminated) {
 			return Promise.reject(new Error("Process has been terminated"));
