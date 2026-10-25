@@ -5,147 +5,53 @@ const defaults = {
 };
 
 const guardedName = "__ppermInternalCheck_7d3a";
-const syncIterableName = "__ppermInternalIterable_7d3a";
-const asyncIterableName = "__ppermInternalAsyncIterable_7d3a";
-const keysIterableName = "__ppermInternalKeys_7d3a";
 
-function normalizePermissions(permissions = {}) {
-	return {
-		network: {
-			...defaults.network,
-			...(typeof permissions.network === "boolean"
-				? Object.fromEntries(Object.keys(defaults.network).map(key => [key, permissions.network]))
-				: permissions.network)
-		},
-		storage: {
-			...defaults.storage,
-			...(typeof permissions.storage === "boolean"
-				? Object.fromEntries(Object.keys(defaults.storage).map(key => [key, permissions.storage]))
-				: permissions.storage)
-		},
-		dom: { ...defaults.dom, ...permissions.dom }
-	};
-}
-
-function deny(name) {
-	return () => { throw new DOMException(name + " permission denied", "NotAllowedError"); };
-}
-
-function maskNonCode(source) {
-	const chars = source.split("");
-	let i = 0;
-	while (i < source.length) {
-		const c = source[i];
-		const next = source[i + 1];
-		if (c === "'" || c === '"' || c === "\`") {
-			const quote = c;
-			chars[i++] = " ";
-			while (i < source.length) {
-				const current = source[i];
-				chars[i] = current === "\n" || current === "\r" ? current : " ";
-				i++;
-				if (current === "\\") {
-					if (i < source.length) {
-						chars[i] = source[i] === "\n" || source[i] === "\r" ? source[i] : " ";
-						i++;
-					}
-					continue;
-				}
-				if (current === quote) break;
-			}
-			continue;
-		}
-		if (c === "/" && next === "/") {
-			chars[i++] = " ";
-			chars[i++] = " ";
-			while (i < source.length && source[i] !== "\n") chars[i++] = " ";
-			continue;
-		}
-		if (c === "/" && next === "*") {
-			chars[i++] = " ";
-			chars[i++] = " ";
-			while (i < source.length) {
-				if (source[i] === "*" && source[i + 1] === "/") {
-					chars[i++] = " ";
-					chars[i++] = " ";
-					break;
-				}
-				chars[i] = source[i] === "\n" || source[i] === "\r" ? source[i] : " ";
-				i++;
-			}
-			continue;
-		}
-		i++;
-	}
-	return chars.join("");
-}
-
-function matchingParen(masked, open) {
-	let depth = 0;
-	for (let i = open; i < masked.length; i++) {
-		if (masked[i] === "(") depth++;
-		else if (masked[i] === ")" && --depth === 0) return i;
-	}
-	throw new SyntaxError("Unclosed loop header");
-}
-
-function topLevelParts(masked, start, end, delimiter) {
-	const parts = [];
-	let depth = 0;
-	let segment = start;
-	for (let i = start; i < end; i++) {
-		const c = masked[i];
-		if (c === "(" || c === "[" || c === "{") depth++;
-		else if (c === ")" || c === "]" || c === "}") depth--;
-		else if (depth === 0 && c === delimiter) {
-			parts.push([segment, i]);
-			segment = i + 1;
-		}
-	}
-	parts.push([segment, end]);
-	return parts;
-}
-
-function instrumentLoops(source) {
-	const masked = maskNonCode(source);
+function instrumentStatements(source) {
+	const ast = acorn.parse(source, {
+		ecmaVersion: "latest",
+		sourceType: "script",
+		allowReturnOutsideFunction: true,
+		allowAwaitOutsideFunction: true
+	});
 	const edits = [];
-	const loopPattern = /\b(?:while|for)(?:\s+await)?\s*(\()/g;
-	let match;
+	const seen = new Set();
 
-	while ((match = loopPattern.exec(masked))) {
-		const keyword = match[0].trim().split(/\s/)[0];
-		const open = match.index + match[0].lastIndexOf("(");
-		const close = matchingParen(masked, open);
-		if (keyword === "while") {
-			edits.push([close, close, "))"]);
-			edits.push([open + 1, open + 1, "(" + guardedName + "(), ("]);
-			continue;
+	function walk(node, parent = null) {
+		if (!node || typeof node.type !== "string") return;
+
+		if (node.type === "BlockStatement" || node.type === "StaticBlock") {
+			const position = node.start + 1;
+			if (!seen.has(position)) {
+				edits.push([position, position, guardedName + "();"]);
+				seen.add(position);
+			}
+		} else {
+			const isStatement = node.type.endsWith("Statement")
+				|| node.type === "FunctionDeclaration"
+				|| node.type === "ClassDeclaration"
+				|| node.type === "VariableDeclaration" && !(
+					parent && ["ForStatement", "ForInStatement", "ForOfStatement"].includes(parent.type)
+				);
+			if (isStatement && !node.directive && !seen.has(node.start)) {
+				edits.push([node.start, node.start, guardedName + "();"]);
+				seen.add(node.start);
+			}
 		}
 
-		const parts = topLevelParts(masked, open + 1, close, ";");
-		if (parts.length === 3) {
-			const conditionStart = parts[1][0];
-			const conditionEnd = parts[1][1];
-			const condition = source.slice(conditionStart, conditionEnd).trim() || "true";
-			edits.push([conditionStart, conditionEnd, "(" + guardedName + "(), (" + condition + "))"]);
-			continue;
+		for (const key of Object.keys(node)) {
+			if (key === "start" || key === "end" || key === "loc") continue;
+			const value = node[key];
+			if (Array.isArray(value)) {
+				for (const child of value) walk(child, node);
+			} else if (value && typeof value.type === "string") {
+				walk(value, node);
+			}
 		}
-
-		const header = masked.slice(open + 1, close);
-		const iterator = /\b[\s\S]*?\b(of|in)\b/.exec(header);
-		if (!iterator) continue;
-		const isAsyncFor = /^for\s+await\s*\(/.test(masked.slice(match.index, open + 1));
-		const operator = iterator[1];
-		const operatorAt = open + 1 + iterator.index + iterator[0].lastIndexOf(operator);
-		const expressionStart = operatorAt + operator.length;
-		const expression = source.slice(expressionStart, close).trim();
-		const helper = isAsyncFor ? asyncIterableName : operator === "in" ? keysIterableName : syncIterableName;
-		edits.push([expressionStart, close, " " + helper + "(" + expression + ")"]);
 	}
 
+	walk(ast);
 	edits.sort((a, b) => b[0] - a[0]);
-	for (let i = 0; i < edits.length; i++) {
-		const [start, end, replacement] = edits[i];
+	for (const [start, end, replacement] of edits) {
 		source = source.slice(0, start) + replacement + source.slice(end);
 	}
 	return source;
@@ -406,7 +312,7 @@ export class PpermProcess extends EventTarget {
 	#terminated = false;
 	#active = new Set();
 	#runtime;
-	#maxLoopIterations;
+	#maxStatements;
 	#terminationPromise;
 	#resolveTermination;
 
@@ -414,7 +320,7 @@ export class PpermProcess extends EventTarget {
 		super();
 		const permissions = options.permissions ?? options;
 		this.permissions = Object.freeze(normalizePermissions(permissions));
-		this.#maxLoopIterations = Math.max(1, Number(options.maxLoopIterations) || 100000);
+		this.#maxStatements = Math.max(1, Number(options.maxStatements ?? options.maxLoopIterations) || 100000);
 		this.#terminationPromise = new Promise(resolve => { this.#resolveTermination = resolve; });
 		let root = null;
 		if (this.permissions.dom.enabled) {
@@ -434,15 +340,14 @@ export class PpermProcess extends EventTarget {
 		const check = () => {
 			if (this.#terminated) throw new DOMException("Process has been terminated", "AbortError");
 			localCheckCount.value++;
-			if (localCheckCount.value > this.#maxLoopIterations) {
-				throw new DOMException("Execution stopped: loop iteration limit exceeded", "TimeoutError");
+			if (localCheckCount.value > this.#maxStatements) {
+				throw new DOMException("Execution stopped: statement budget exceeded", "TimeoutError");
 			}
 		};
-		const instrumented = instrumentLoops(String(code));
+		const instrumented = instrumentStatements(String(code));
 		const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
 		const execute = new AsyncFunction(
-			"postMessage", "permissions", "document",
-			guardedName, syncIterableName, asyncIterableName, keysIterableName,
+			"postMessage", "permissions", "document", guardedName,
 			"fetch", "WebSocket", "EventSource", "XMLHttpRequest", "indexedDB", "caches",
 			instrumented
 		);
@@ -465,9 +370,6 @@ export class PpermProcess extends EventTarget {
 			context.permissions,
 			context.document,
 			check,
-			function* (iterable) { for (const value of iterable) { check(); yield value; } },
-			async function* (iterable) { for await (const value of iterable) { check(); yield value; } },
-			function* (object) { for (const key in object) { check(); yield key; } },
 			denyIf(network.fetch, "fetch", window.fetch.bind(window)),
 			denyIf(network.webSocket, "WebSocket", window.WebSocket),
 			denyIf(network.eventSource, "EventSource", window.EventSource),
