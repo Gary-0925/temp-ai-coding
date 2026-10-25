@@ -190,6 +190,7 @@ li {
 }
 
 .editor,
+.api-help,
 .output,
 #guest,
 #file-content,
@@ -212,6 +213,18 @@ li {
 
 .toolbar {
 	margin: 10px 0 24px;
+}
+
+.api-help {
+	margin: 12px 0;
+	padding: 8px 0;
+	border-bottom: 1px solid var(--border);
+	color: var(--muted);
+	font-size: 12px;
+}
+
+.api-help code {
+	color: #222;
 }
 
 .runtime-grid {
