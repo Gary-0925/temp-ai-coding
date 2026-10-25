@@ -176,10 +176,9 @@
 				<textarea id="editor" spellcheck="false" aria-label="JavaScript 代码编辑器">postMessage("Hello from pperm.js");
 postMessage("document: " + typeof document);
 
-if (permissions.dom.enabled) {
-	await dom.setText("#message", "由 Worker 通过 DOM 权限桥接修改");
-	postMessage(await dom.getText("#message"));
-}
+document.body.textContent = "通过原生风格的 document.body.textContent 修改";
+await new Promise(resolve => setTimeout(resolve, 50));
+postMessage(await document.body.textContent);
 
 return 42;</textarea>
 				<div class="toolbar">
@@ -205,7 +204,7 @@ return 42;</textarea>
 						<label><input id="domEnabled" type="checkbox"> 允许操作指定元素</label>
 						<label for="domRoot">可操作的根元素选择器</label>
 						<input id="domRoot" value="#dom-target" aria-label="DOM 根元素选择器">
-						<p class="hint">DOM 通过异步桥接 API 操作，不能直接访问 document。权限仅是原型级限制，不是安全沙箱。</p>
+						<p class="hint">代码可使用 document.body、querySelector 和元素属性等原生风格写法。跨线程读取需要 await；权限仍是原型级限制，不是安全沙箱。</p>
 					</div>
 				</section>
 
