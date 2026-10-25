@@ -1,3 +1,5 @@
+import * as acorn from "acorn";
+
 const defaults = {
 	network: { fetch: true, webSocket: true, eventSource: true, xmlHttpRequest: true },
 	storage: { indexedDB: true, cache: true },
