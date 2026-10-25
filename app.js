@@ -149,7 +149,7 @@ async function renderFiles() {
 		edit.textContent = '编辑';
 		edit.addEventListener('click', () => showFileEditor(file));
 		run.className = 'button';
-		run.textContent = '打开';
+		run.textContent = '载入';
 		run.addEventListener('click', () => {
 			$('#source').value = file.content;
 			showPage('runtime');
@@ -463,6 +463,10 @@ async function importFile(event) {
 	try {
 		if (file.size > 1000000) {
 			throw new Error('导入文件不能超过 1 MB。');
+		}
+
+		if (!validFileName(file.name)) {
+			throw new Error('导入文件名无效。');
 		}
 
 		const content = await file.text();
