@@ -10,58 +10,43 @@
 	</head>
 	<body>
 		<header class="topbar">
-			<a class="brand" href="#overview" aria-label="CRADOS 首页">CRADOS</a>
+			<a class="brand" href="#overview">CRADOS</a>
 			<nav class="navigation" aria-label="主导航">
 				<button class="nav-button active" data-page="overview">概览</button>
 				<button class="nav-button" data-page="runtime">运行环境</button>
-				<button class="nav-button" data-page="permissions">权限</button>
 				<button class="nav-button" data-page="files">文件</button>
-				<button class="nav-button" data-page="about">架构</button>
+				<button class="nav-button" data-page="permissions">权限</button>
+				<button class="nav-button" data-page="about">关于</button>
 			</nav>
-			<time id="clock"></time>
 		</header>
 		<main>
 			<section class="page" id="overview">
-				<div class="intro">
-					<p class="eyebrow">BROWSER-NATIVE EXPERIMENT</p>
-					<h1>把浏览器当作运行平台。</h1>
-					<p class="description">CRADOS 是一个基于浏览器 JavaScript 引擎的轻量实验。应用运行在沙箱 iframe 中，通过权限代理访问受控系统服务。</p>
-					<button class="button primary" data-open="runtime">打开运行环境</button>
+				<h1>CRADOS</h1>
+				<p class="lead">基于浏览器 JavaScript 引擎的轻量运行环境实验。</p>
+				<div class="overview-list">
+					<div><span>运行环境</span><strong>JavaScript / sandbox iframe</strong></div>
+					<div><span>虚拟文件</span><strong id="file-count">正在加载</strong></div>
+					<div><span>本地存储</span><strong>IndexedDB</strong></div>
+					<div><span>部署方式</span><strong>静态网页，无需构建</strong></div>
 				</div>
-				<div class="summary-grid">
-					<article class="card">
-						<p class="label">执行环境</p>
-						<p class="value">JavaScript</p>
-						<p class="secondary">浏览器原生引擎</p>
-					</article>
-					<article class="card">
-						<p class="label">隔离方式</p>
-						<p class="value">Sandbox iframe</p>
-						<p class="secondary">独立的 guest 页面</p>
-					</article>
-					<article class="card">
-						<p class="label">虚拟文件</p>
-						<p class="value" id="file-count">0 个文件</p>
-						<p class="secondary">保存在当前浏览器</p>
-					</article>
-				</div>
-				<section class="card section-card">
-					<h2>设计原则</h2>
-					<div class="principles">
-						<div><h3>应用与宿主分离</h3><p>Guest 代码不直接访问 OS 主页面的 DOM。</p></div>
-						<div><h3>显式权限</h3><p>网络和文件操作必须经过宿主权限检查。</p></div>
-						<div><h3>静态部署</h3><p>无需构建工具、服务端或额外依赖。</p></div>
-						<div><h3>明确安全边界</h3><p>这是浏览器实验，不是经过安全认证的操作系统。</p></div>
-					</div>
-				</section>
+				<h2>快速开始</h2>
+				<ol>
+					<li>在「运行环境」中编写 JavaScript 并运行。</li>
+					<li>需要保存代码时，使用「保存到文件」。</li>
+					<li>网络请求和虚拟文件 API 默认需要在「权限」中授权。</li>
+				</ol>
+				<p class="notice">这是实验性原型。沙箱不能阻止无限循环造成的 CPU 占用，不要运行不可信的长时间任务。</p>
 			</section>
 			<section class="page hidden" id="runtime">
 				<div class="page-heading">
-					<div><p class="eyebrow">EXECUTION</p><h1>JavaScript 运行环境</h1></div>
-					<button class="button primary" id="run">运行代码</button>
+					<h1>运行环境</h1>
+					<div class="actions">
+						<button class="button" id="save-source">保存到文件</button>
+						<button class="button primary" id="run">运行代码</button>
+					</div>
 				</div>
-				<p class="secondary">使用 Ctrl/⌘ + Enter 运行。网络权限默认关闭。</p>
-				<textarea id="source" class="editor" spellcheck="false">console.log("Hello from CRADOS");
+				<p class="secondary">Ctrl/⌘ + Enter 运行。Guest DOM 与系统页面隔离。</p>
+				<textarea id="source" class="editor" spellcheck="false" aria-label="JavaScript 源码">console.log("Hello from CRADOS");
 console.log("2 + 2 =", 2 + 2);
 document.body.innerHTML = "<h2>Guest DOM works.</h2><p>This is the guest document.</p>";</textarea>
 				<div class="toolbar">
@@ -72,37 +57,56 @@ document.body.innerHTML = "<h2>Guest DOM works.</h2><p>This is the guest documen
 				</div>
 				<div class="runtime-grid">
 					<section><h2>Guest 页面</h2><iframe id="guest" title="沙箱应用" sandbox="allow-scripts"></iframe></section>
-					<section><h2>系统控制台</h2><pre id="output" class="output">内核就绪，等待执行。</pre></section>
+					<section><div class="console-heading"><h2>控制台</h2><span id="runtime-status">就绪</span></div><pre id="output" class="output"></pre></section>
 				</div>
-				<p class="notice">Guest 脚本仍可能占用 CPU 和内存。启用网络后，请求仍受浏览器 CORS 和混合内容策略限制。</p>
-			</section>
-			<section class="page hidden" id="permissions">
-				<div class="page-heading"><div><p class="eyebrow">SECURITY</p><h1>权限管理</h1></div><button class="button" id="revoke">撤销全部权限</button></div>
-				<p class="secondary">权限保存在当前浏览器中。宿主会在每次调用时重新检查授权。</p>
-				<label class="permission-row"><input type="checkbox" data-cap="network"><span><strong>网络请求</strong><small>允许 Guest 通过代理发起 HTTPS 请求；localhost 也可用于本地开发。</small></span></label>
-				<label class="permission-row"><input type="checkbox" data-cap="storage"><span><strong>虚拟文件</strong><small>允许 Guest 读取、列出和写入 CRADOS 虚拟文件。</small></span></label>
-				<div class="notice">这是原型权限界面，不构成安全认证。正式使用还需要威胁模型、严格的 RPC 校验、资源限制和浏览器测试。</div>
 			</section>
 			<section class="page hidden" id="files">
-				<div class="page-heading"><div><p class="eyebrow">LOCAL STORAGE</p><h1>虚拟文件</h1></div><button class="button primary" id="new-file">新建文件</button></div>
-				<p class="secondary">文件保存在当前浏览器的 IndexedDB 中，不会主动上传。</p>
-				<div id="file-list" class="file-list"></div>
-				<p class="secondary small">浏览器或用户可能清除本地数据。不要在这里保存机密信息。</p>
+				<div class="page-heading">
+					<h1>虚拟文件</h1>
+					<div class="actions">
+						<button class="button" id="import-file">导入文件</button>
+						<button class="button primary" id="new-file">新建文件</button>
+					</div>
+				</div>
+				<p class="secondary">文件只保存在当前浏览器。可以编辑、运行、导入和导出文本文件。</p>
+				<input id="import-input" type="file" accept=".js,.txt,.json,.html,.css,.md,text/*,application/json" hidden>
+				<div class="file-layout">
+					<div id="file-list" class="file-list"></div>
+					<form id="file-form" class="file-form hidden">
+						<label for="file-name">文件名</label>
+						<input id="file-name" name="name" maxlength="120" required autocomplete="off">
+						<label for="file-content">内容</label>
+						<textarea id="file-content" name="content" spellcheck="false" required></textarea>
+						<div class="actions">
+							<button class="button primary" type="submit">保存文件</button>
+							<button class="button" type="button" id="cancel-file">取消</button>
+						</div>
+						<p id="file-error" class="error" role="status"></p>
+					</form>
+				</div>
+			</section>
+			<section class="page hidden" id="permissions">
+				<h1>权限</h1>
+				<p class="secondary">权限保存在当前浏览器中。关闭权限后，新的调用会立即被拒绝。</p>
+				<label class="permission-row"><input type="checkbox" data-cap="network"><span><strong>网络请求</strong><small>允许 Guest 通过代理请求 HTTPS 地址和 localhost。请求仍受 CORS 等浏览器策略限制。</small></span></label>
+				<label class="permission-row"><input type="checkbox" data-cap="storage"><span><strong>虚拟文件</strong><small>允许 Guest 列出、读取和写入虚拟文件。</small></span></label>
+				<div class="actions permission-actions"><button class="button" id="revoke">撤销全部权限</button></div>
+				<p class="notice">网络代理不是匿名代理。请勿向不可信代码授权网络或文件访问。</p>
 			</section>
 			<section class="page hidden" id="about">
-				<p class="eyebrow">ARCHITECTURE</p>
-				<h1>系统架构</h1>
-				<div class="architecture">
-					<div><strong>CRADOS Shell</strong><span>可信 UI</span></div>
-					<div><strong>Permission Broker</strong><span>权限检查与 RPC</span></div>
-					<div><strong>Sandboxed Guest</strong><span>不可信 JavaScript</span></div>
-					<div><strong>Browser Engine</strong><span>执行环境与 Web API</span></div>
-					<div><strong>IndexedDB</strong><span>本地虚拟文件</span></div>
+				<h1>关于 CRADOS</h1>
+				<p class="lead">浏览器提供执行引擎，CRADOS 提供最小化的应用外壳和受控 API。</p>
+				<div class="overview-list">
+					<div><span>应用隔离</span><strong>sandbox iframe</strong></div>
+					<div><span>权限代理</span><strong>宿主消息桥接</strong></div>
+					<div><span>文件存储</span><strong>IndexedDB</strong></div>
+					<div><span>构建步骤</span><strong>无</strong></div>
 				</div>
-				<p class="secondary">源码：<a href="https://github.com/Gary-0925/temp-ai-coding/tree/clear-repo-test">clear-repo-test 分支</a></p>
+				<p class="notice">这不是经过安全认证的操作系统或强隔离执行服务。Guest 仍可耗尽 CPU 和内存，浏览器 API 也不等同于操作系统权限。</p>
+				<p><a href="https://github.com/Gary-0925/temp-ai-coding/tree/clear-repo-test">查看源代码</a></p>
 			</section>
 		</main>
-		<footer>CRADOS · Browser-native execution</footer>
+		<footer>CRADOS</footer>
 		<script src="./app.js"></script>
 	</body>
 </html>
