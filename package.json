@@ -1,0 +1,14 @@
+{
+	"name": "pperm.js",
+	"version": "0.1.0",
+	"type": "module",
+	"description": "A small browser JavaScript worker process API with configurable capabilities.",
+	"exports": {
+		".": "./pperm.js"
+	},
+	"files": [
+		"pperm.js",
+		"pperm.worker.js"
+	],
+	"license": "MIT"
+}
