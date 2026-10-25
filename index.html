@@ -176,10 +176,12 @@
 				<textarea id="editor" spellcheck="false" aria-label="JavaScript 代码编辑器">postMessage("Hello from pperm.js");
 postMessage("document: " + typeof document);
 
-const result = 6 * 7;
-postMessage("计算结果: " + result);
+if (permissions.dom.enabled) {
+	await dom.setText("#message", "由 Worker 通过 DOM 权限桥接修改");
+	postMessage(await dom.getText("#message"));
+}
 
-return result;</textarea>
+return 42;</textarea>
 				<div class="toolbar">
 					<button class="primary" id="run">运行 ▶</button>
 					<button id="stop" disabled>停止</button>
@@ -191,9 +193,26 @@ return result;</textarea>
 				<section class="panel" style="margin-bottom:16px">
 					<div class="panel-title">进程权限</div>
 					<div class="permissions">
-						<label><input id="network" type="checkbox"> 网络访问（fetch、WebSocket 等）</label>
-						<label><input id="storage" type="checkbox"> 存储访问（IndexedDB、Cache API）</label>
-						<p class="hint">权限在每次运行时应用于新建的 Worker 进程。</p>
+						<strong>网络</strong>
+						<label><input id="fetch" type="checkbox"> fetch</label>
+						<label><input id="webSocket" type="checkbox"> WebSocket</label>
+						<label><input id="eventSource" type="checkbox"> EventSource</label>
+						<label><input id="xmlHttpRequest" type="checkbox"> XMLHttpRequest</label>
+						<strong>存储</strong>
+						<label><input id="indexedDB" type="checkbox"> IndexedDB</label>
+						<label><input id="cache" type="checkbox"> Cache API</label>
+						<strong>DOM 桥接</strong>
+						<label><input id="domEnabled" type="checkbox"> 允许操作指定元素</label>
+						<label for="domRoot">可操作的根元素选择器</label>
+						<input id="domRoot" value="#dom-target" aria-label="DOM 根元素选择器">
+						<p class="hint">DOM 通过异步桥接 API 操作，不能直接访问 document。权限仅是原型级限制，不是安全沙箱。</p>
+					</div>
+				</section>
+
+				<section class="panel" style="margin-bottom:16px">
+					<div class="panel-title">受控 DOM 目标</div>
+					<div id="dom-target" style="padding:16px">
+						<p id="message">这是允许 Playground 进程操作的示例元素。</p>
 					</div>
 				</section>
 
@@ -243,8 +262,20 @@ return result;</textarea>
 
 				const current = pperm.create({
 					permissions: {
-						network: document.querySelector("#network").checked,
-						storage: document.querySelector("#storage").checked
+						network: {
+							fetch: document.querySelector("#fetch").checked,
+							webSocket: document.querySelector("#webSocket").checked,
+							eventSource: document.querySelector("#eventSource").checked,
+							xmlHttpRequest: document.querySelector("#xmlHttpRequest").checked
+						},
+						storage: {
+							indexedDB: document.querySelector("#indexedDB").checked,
+							cache: document.querySelector("#cache").checked
+						},
+						dom: {
+							enabled: document.querySelector("#domEnabled").checked,
+							root: document.querySelector("#domRoot").value.trim() || "#dom-target"
+						}
 					}
 				});
 
