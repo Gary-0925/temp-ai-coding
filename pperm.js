@@ -221,12 +221,18 @@ export class PpermProcess extends EventTarget {
 					if (!target || typeof target.querySelectorAll !== "function") throw new Error("DOM element not found");
 					value = Array.from(target.querySelectorAll(args.selector), node => serialize(node));
 					break;
-				case "createElement":
-					value = serialize(document.createElement(String(args.tagName)));
+				case "createElement": {
+					const element = document.createElement(String(args.tagName));
+					nodeId(element);
+					value = serialize(element);
 					break;
-				case "createTextNode":
-					value = serialize(document.createTextNode(String(args.text)));
+				}
+				case "createTextNode": {
+					const node = document.createTextNode(String(args.text));
+					nodeId(node);
+					value = serialize(node);
 					break;
+				}
 				case "call": {
 					if (!target) throw new Error("DOM element not found");
 					const method = target[args.method];
