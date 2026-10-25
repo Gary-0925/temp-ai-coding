@@ -164,7 +164,7 @@
 	<body>
 		<header>
 			<h1>pperm.js <span style="color:#818cf8">Playground</span></h1>
-			<p>在 Worker 进程中编写并运行 JavaScript，按需调整进程权限。</p>
+			<p>在主线程中运行 JavaScript，DOM API 同步调用；循环有迭代次数上限。</p>
 		</header>
 
 		<main class="workspace">
@@ -181,13 +181,13 @@ if (!permissions.dom.enabled) {
 	return 42;
 }
 
-document.body.textContent = "原生风格 DOM API 示例";
+document.body.textContent = "同步 DOM API 示例";
 
-const button = await document.createElement("button");
+const button = document.createElement("button");
 button.textContent = "点击我";
 button.style.backgroundColor = "#4f46e5";
 button.style.color = "white";
-await document.body.appendChild(button);
+document.body.appendChild(button);
 
 postMessage("按钮已创建，点击按钮以测试事件监听。");
 await new Promise(resolve => {
@@ -219,7 +219,7 @@ await new Promise(resolve => {
 						<label><input id="domEnabled" type="checkbox"> 允许操作指定元素</label>
 						<label for="domRoot">可操作的根元素选择器</label>
 						<input id="domRoot" value="#dom-target" aria-label="DOM 根元素选择器">
-						<p class="hint">代码可使用 document.body、querySelector 和元素属性等原生风格写法。跨线程读取需要 await；权限仍是原型级限制，不是安全沙箱。</p>
+						<p class="hint">DOM 操作同步执行，不需要为 DOM 写 await。循环最多执行 100000 次检查；这不是恶意代码安全沙箱。</p>
 					</div>
 				</section>
 
@@ -241,7 +241,7 @@ await new Promise(resolve => {
 		</main>
 
 		<script type="module">
-			import pperm from "./pperm.js?v=20261025-5";
+			import pperm from "./pperm.js?v=20261025-6";
 
 			const editor = document.querySelector("#editor");
 			const output = document.querySelector("#output");
