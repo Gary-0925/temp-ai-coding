@@ -18,15 +18,15 @@ function instrumentStatements(source) {
 	const edits = [];
 	const seen = new Set();
 
-	function walk(node, parent = null) {
+	function add(position, replacement) {
+		edits.push([position, position, replacement]);
+	}
+
+	function walk(node, parent = null, parentKey = "") {
 		if (!node || typeof node.type !== "string") return;
 
 		if (node.type === "BlockStatement" || node.type === "StaticBlock") {
-			const position = node.start + 1;
-			if (!seen.has(position)) {
-				edits.push([position, position, guardedName + "();"]);
-				seen.add(position);
-			}
+			add(node.start + 1, guardedName + "();");
 		} else {
 			const isStatement = node.type.endsWith("Statement")
 				|| node.type === "FunctionDeclaration"
@@ -34,9 +34,17 @@ function instrumentStatements(source) {
 				|| node.type === "VariableDeclaration" && !(
 					parent && ["ForStatement", "ForInStatement", "ForOfStatement"].includes(parent.type)
 				);
-			if (isStatement && !node.directive && !seen.has(node.start)) {
-				edits.push([node.start, node.start, guardedName + "();"]);
-				seen.add(node.start);
+			if (isStatement && !node.directive) {
+				const isControlledBody = parent
+					&& ["consequent", "alternate", "body"].includes(parentKey)
+					&& parent.type !== "LabeledStatement";
+				if (isControlledBody) {
+					add(node.start, "{" + guardedName + "();");
+					add(node.end, "}");
+				} else if (!seen.has(node.start)) {
+					add(node.start, guardedName + "();");
+					seen.add(node.start);
+				}
 			}
 		}
 
@@ -44,9 +52,9 @@ function instrumentStatements(source) {
 			if (key === "start" || key === "end" || key === "loc") continue;
 			const value = node[key];
 			if (Array.isArray(value)) {
-				for (const child of value) walk(child, node);
+				for (const child of value) walk(child, node, key);
 			} else if (value && typeof value.type === "string") {
-				walk(value, node);
+				walk(value, node, key);
 			}
 		}
 	}
