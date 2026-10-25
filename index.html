@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>pperm.js</title>
+	</head>
+	<body>
+		<h1>pperm.js</h1>
+		<p>浏览器 JavaScript Worker 进程库。</p>
+		<pre id="output"></pre>
+		<script type="module">
+			import pperm from "./pperm.js";
+
+			const output = document.querySelector("#output");
+			const write = value => {
+				output.textContent += String(value) + "\n";
+			};
+
+			const process = pperm.create({
+				permissions: {
+					network: false,
+					storage: false
+				}
+			});
+
+			process.addEventListener("message", event => write(event.detail));
+			process.addEventListener("error", event => write(event.detail.message));
+
+			process.run(`
+				postMessage("Hello from pperm.js");
+				postMessage("document: " + typeof document);
+				42
+			`).then(value => {
+				write("Result: " + value);
+				process.terminate();
+			}).catch(error => {
+				write(error.message);
+				process.terminate();
+			});
+		</script>
+	</body>
+</html>
