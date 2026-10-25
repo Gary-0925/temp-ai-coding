@@ -79,7 +79,7 @@ function revive(value) {
 }
 
 const elementMethods = new Set([
-	"querySelector", "querySelectorAll", "getAttribute", "getAttributeNames",
+	"querySelector", "querySelectorAll", "getElementsByClassName", "getElementsByTagName", "getAttribute", "getAttributeNames",
 	"setAttribute", "removeAttribute", "hasAttribute", "toggleAttribute",
 	"append", "prepend", "appendChild", "insertBefore", "replaceChild",
 	"replaceChildren", "before", "after", "remove", "focus", "blur", "click",
@@ -111,13 +111,19 @@ function createElementProxy(reference, metadata = {}) {
 			if (property === "querySelectorAll") {
 				return async selector => revive(await requestDom("querySelectorAll", reference, { selector: String(selector) }));
 			}
+			if (property === "getElementsByClassName") {
+				return async className => revive(await requestDom("call", reference, { method: "getElementsByClassName", args: [String(className)] }));
+			}
+			if (property === "getElementsByTagName") {
+				return async tagName => revive(await requestDom("call", reference, { method: "getElementsByTagName", args: [String(tagName)] }));
+			}
 			if (property === "addEventListener") {
 				return (eventType, callback, options) => {
 					if (typeof callback !== "function") return;
 					const listenerId = ++nextListenerId;
 					const key = String(eventType) + ":" + String(listenerId);
 					listeners.set(key, { eventType: String(eventType), callback, options, listenerId });
-					eventCallbacks.set(listenerId, { callback, reference, eventType: String(eventType) });
+					eventCallbacks.set(listenerId, { callback, reference, eventType: String(eventType), once: typeof options === "object" && !!options.once });
 					requestDom("event-listener-add", reference, {
 						eventType: String(eventType), listenerId, options: typeof options === "boolean" ? options : (options ? { capture: !!options.capture, once: !!options.once, passive: !!options.passive } : false)
 					}).catch(reportAsyncError);
@@ -198,6 +204,11 @@ function createDocumentProxy() {
 			if (property === "querySelectorAll") return async selector => revive(await requestDom("querySelectorAll", rootReference, { selector: String(selector) }));
 			if (property === "createElement") return async tagName => revive(await requestDom("createElement", rootReference, { tagName: String(tagName) }));
 			if (property === "createTextNode") return async text => revive(await requestDom("createTextNode", rootReference, { text: String(text) }));
+			if (property === "createComment") return async text => revive(await requestDom("createComment", rootReference, { text: String(text) }));
+			if (property === "createDocumentFragment") return async () => revive(await requestDom("createDocumentFragment", rootReference));
+			if (property === "getElementById") return async id => revive(await requestDom("getElementById", rootReference, { id: String(id) }));
+			if (property === "getElementsByClassName") return async className => revive(await requestDom("getElementsByClassName", rootReference, { className: String(className) }));
+			if (property === "getElementsByTagName") return async tagName => revive(await requestDom("getElementsByTagName", rootReference, { tagName: String(tagName) }));
 			if (property === "addEventListener") return (type, callback, options) => createElementProxy(rootReference).addEventListener(type, callback, options);
 			return requestDom("document-get", rootReference, { property: String(property) });
 		}
@@ -234,6 +245,8 @@ self.addEventListener("message", async ({ data }) => {
 				entry.callback.call(createElementProxy(entry.reference), event);
 			} catch (error) {
 				reportAsyncError(error);
+			} finally {
+				if (entry.once) eventCallbacks.delete(data.listenerId);
 			}
 		}
 		return;
