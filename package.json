@@ -9,5 +9,8 @@
 	"files": [
 		"pperm.js"
 	],
-	"license": "MIT"
+	"license": "MIT",
+	"dependencies": {
+		"acorn": "^8.15.0"
+	}
 }
