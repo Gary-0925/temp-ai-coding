@@ -338,7 +338,7 @@ export class PpermProcess extends EventTarget {
 	#terminated = false;
 	#active = new Set();
 	#runtime;
-	#maxStatements;
+	#maxExecutionTimeMs;
 	#terminationPromise;
 	#resolveTermination;
 
@@ -346,7 +346,7 @@ export class PpermProcess extends EventTarget {
 		super();
 		const permissions = options.permissions ?? options;
 		this.permissions = Object.freeze(normalizePermissions(permissions));
-		this.#maxStatements = Math.max(1, Number(options.maxStatements ?? options.maxLoopIterations) || 100000);
+		this.#maxExecutionTimeMs = Math.max(1, Number(options.maxExecutionTimeMs) || 10000);
 		this.#terminationPromise = new Promise(resolve => { this.#resolveTermination = resolve; });
 		let root = null;
 		if (this.permissions.dom.enabled) {
@@ -362,13 +362,15 @@ export class PpermProcess extends EventTarget {
 
 	async run(code) {
 		if (this.#terminated) throw new Error("Process has been terminated");
-		const localCheckCount = { value: 0 };
+		const deadline = performance.now() + this.#maxExecutionTimeMs;
+		const timeoutError = new DOMException("Execution stopped: time limit exceeded", "TimeoutError");
+		let timedOut = false;
 		const check = () => {
-			if (this.#terminated) throw new DOMException("Process has been terminated", "AbortError");
-			localCheckCount.value++;
-			if (localCheckCount.value > this.#maxStatements) {
-				throw new DOMException("Execution stopped: statement budget exceeded", "TimeoutError");
+			if (timedOut || performance.now() >= deadline) {
+				timedOut = true;
+				throw timeoutError;
 			}
+			if (this.#terminated) throw new DOMException("Process has been terminated", "AbortError");
 		};
 		const instrumented = instrumentStatements(String(code));
 		const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
@@ -404,11 +406,20 @@ export class PpermProcess extends EventTarget {
 			denyIf(storage.cache, "caches", window.caches)
 		);
 		this.#active.add(active);
+		let timeoutHandle;
+		const timeout = new Promise((_, reject) => {
+			timeoutHandle = setTimeout(() => {
+				timedOut = true;
+				this.terminate();
+				reject(timeoutError);
+			}, this.#maxExecutionTimeMs);
+		});
 		try {
 			const result = await Promise.race([
 				active,
+				timeout,
 				this.#terminationPromise.then(() => {
-					throw new DOMException("Process has been terminated", "AbortError");
+					throw timedOut ? timeoutError : new DOMException("Process has been terminated", "AbortError");
 				})
 			]);
 			if (this.#terminated) throw new DOMException("Process has been terminated", "AbortError");
@@ -417,6 +428,7 @@ export class PpermProcess extends EventTarget {
 			this.dispatchEvent(new CustomEvent("error", { detail: error }));
 			throw error;
 		} finally {
+			clearTimeout(timeoutHandle);
 			this.#active.delete(active);
 		}
 	}
