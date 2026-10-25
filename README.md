@@ -40,7 +40,7 @@ process.terminate();
 - `message`, `error`, `exit`, and `terminate` events report process activity.
 - `process.terminated` indicates whether the process has been terminated.
 
-Available permission flags are `network`, `storage`, and `clipboard`. Network and storage default to enabled; clipboard defaults to disabled.
+Available permission flags are `network` and `storage`. Both default to enabled.
 
 ## Runtime model
 
