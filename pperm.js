@@ -121,7 +121,11 @@ export class PpermProcess extends EventTarget {
 				if (reference.nodeType === "root") return root;
 
 				const parent = reference.parent ? resolveTarget(reference.parent) : root;
-				return parent?.querySelector(reference.selector) ?? null;
+				if (!parent) return null;
+				if (Number.isInteger(reference.index)) {
+					return parent.querySelectorAll(reference.selector)[reference.index] ?? null;
+				}
+				return parent.querySelector(reference.selector) ?? null;
 			};
 
 			const target = resolveTarget(data.target);
