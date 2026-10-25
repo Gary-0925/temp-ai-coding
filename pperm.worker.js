@@ -41,6 +41,7 @@ function applyPermissions(permissions) {
 }
 
 function requestDom(operation, target, args = {}) {
+	target ??= { nodeType: "root" };
 	if (!currentPermissions.dom?.enabled) {
 		return Promise.reject(new DOMException("DOM permission denied", "NotAllowedError"));
 	}
