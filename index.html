@@ -167,7 +167,7 @@
 	<body>
 		<header>
 			<h1>pperm.js <span style="color:#818cf8">Playground</span></h1>
-			<p>在主线程中运行 JavaScript，DOM API 同步调用；循环有迭代次数上限。</p>
+			<p>在主线程中运行 JavaScript，DOM API 同步调用；按语句计步限制执行预算。</p>
 		</header>
 
 		<main class="workspace">
@@ -222,7 +222,7 @@ await new Promise(resolve => {
 						<label><input id="domEnabled" type="checkbox"> 允许操作指定元素</label>
 						<label for="domRoot">可操作的根元素选择器</label>
 						<input id="domRoot" value="#dom-target" aria-label="DOM 根元素选择器">
-						<p class="hint">DOM 操作同步执行，不需要为 DOM 写 await。循环最多执行 100000 次检查；这不是恶意代码安全沙箱。</p>
+						<p class="hint">DOM 操作同步执行，不需要为 DOM 写 await。默认语句预算为 100000 次检查；这不是硬性超时或恶意代码安全沙箱。</p>
 					</div>
 				</section>
 
@@ -244,7 +244,7 @@ await new Promise(resolve => {
 		</main>
 
 		<script type="module">
-			import pperm from "./pperm.js?v=20261025-9";
+			import pperm from "./pperm.js?v=20261025-10";
 
 			const editor = document.querySelector("#editor");
 			const output = document.querySelector("#output");
