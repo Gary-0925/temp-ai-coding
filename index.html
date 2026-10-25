@@ -174,13 +174,28 @@
 					<span id="status">就绪</span>
 				</div>
 				<textarea id="editor" spellcheck="false" aria-label="JavaScript 代码编辑器">postMessage("Hello from pperm.js");
-postMessage("document: " + typeof document);
+postMessage("DOM permission: " + permissions.dom.enabled);
 
-document.body.textContent = "通过原生风格的 document.body.textContent 修改";
-await new Promise(resolve => setTimeout(resolve, 50));
-postMessage(await document.body.textContent);
+if (!permissions.dom.enabled) {
+	postMessage("请启用 DOM 权限后运行完整示例。");
+	return 42;
+}
 
-return 42;</textarea>
+document.body.textContent = "原生风格 DOM API 示例";
+
+const button = await document.createElement("button");
+button.textContent = "点击我";
+button.style.backgroundColor = "#4f46e5";
+button.style.color = "white";
+await document.body.appendChild(button);
+
+postMessage("按钮已创建，点击按钮以测试事件监听。");
+await new Promise(resolve => {
+	button.addEventListener("click", event => {
+		postMessage("收到事件：" + event.type);
+		resolve();
+	}, { once: true });
+});</textarea>
 				<div class="toolbar">
 					<button class="primary" id="run">运行 ▶</button>
 					<button id="stop" disabled>停止</button>
