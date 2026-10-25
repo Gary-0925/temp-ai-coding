@@ -189,15 +189,17 @@ function createClassListProxy(reference) {
 }
 
 function createDocumentProxy() {
+	const rootReference = { nodeType: "root" };
+
 	return new Proxy(Object.create(null), {
 		get(_, property) {
-			if (property === "body" || property === "documentElement") return createElementProxy(null);
-			if (property === "querySelector") return selector => createElementProxy({ parent: null, selector: String(selector) });
-			if (property === "querySelectorAll") return async selector => revive(await requestDom("querySelectorAll", null, { selector: String(selector) }));
-			if (property === "createElement") return async tagName => revive(await requestDom("createElement", null, { tagName: String(tagName) }));
-			if (property === "createTextNode") return async text => revive(await requestDom("createTextNode", null, { text: String(text) }));
-			if (property === "addEventListener") return (type, callback, options) => createElementProxy(null).addEventListener(type, callback, options);
-			return requestDom("document-get", null, { property: String(property) });
+			if (property === "body" || property === "documentElement") return createElementProxy(rootReference);
+			if (property === "querySelector") return selector => createElementProxy({ parent: rootReference, selector: String(selector) });
+			if (property === "querySelectorAll") return async selector => revive(await requestDom("querySelectorAll", rootReference, { selector: String(selector) }));
+			if (property === "createElement") return async tagName => revive(await requestDom("createElement", rootReference, { tagName: String(tagName) }));
+			if (property === "createTextNode") return async text => revive(await requestDom("createTextNode", rootReference, { text: String(text) }));
+			if (property === "addEventListener") return (type, callback, options) => createElementProxy(rootReference).addEventListener(type, callback, options);
+			return requestDom("document-get", rootReference, { property: String(property) });
 		}
 	});
 }
