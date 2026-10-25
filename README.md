@@ -8,7 +8,7 @@ A small browser JavaScript runner with synchronous DOM access and configurable p
 import pperm from "./pperm.js";
 
 const process = pperm.create({
-	maxLoopIterations: 100000,
+	maxStatements: 100000,
 	permissions: {
 		network: {
 			fetch: true,
@@ -47,7 +47,7 @@ DOM operations are synchronous, so DOM access and mutation do not require await.
 
 ## API
 
-- pperm.create({ permissions, maxLoopIterations }) creates a process runner.
+- pperm.create({ permissions, maxStatements }) creates a process runner.
 - process.run(code) executes JavaScript and resolves with its completion value.
 - process.postMessage(value) dispatches a message event on the process.
 - process.terminate() marks the process as terminated, removes its registered DOM listeners, and makes later guarded operations fail.
@@ -64,11 +64,11 @@ DOM is disabled by default. Enable dom.enabled and set dom.root to the selector 
 
 The bridge supports document.querySelector, querySelectorAll, getElementById, getElementsByClassName, getElementsByTagName, createElement, createTextNode, createComment, createDocumentFragment, activeElement, and common element methods, properties, styles, class lists, and event listeners. Collection-returning helpers return arrays rather than live native NodeList or HTMLCollection objects.
 
-## Preventing runaway loops
+## Statement budget
 
-The runner instruments while conditions, classic for conditions, and for...of, for await...of, and for...in iteration. Each process run has a shared loop-check budget, controlled by maxLoopIterations (default: 100000). When the budget is exceeded, the run throws a TimeoutError instead of continuing an unbounded loop.
+Before execution, Acorn parses the code and the runner inserts a budget check at each executable statement and at each block entry. The per-run budget is controlled by maxStatements (default: 100000). maxLoopIterations remains accepted as a compatibility alias. Exceeding the budget throws a TimeoutError. This catches empty-body loops too, because entering their block or executing their empty statement consumes budget.
 
-This is a best-effort guard, not a hard execution timeout. It cannot interrupt a single long-running operation, every possible source-code construct, or hostile code that bypasses the instrumented paths. Because code runs on the main thread, a loop can still block the page until a guard check is reached. terminate() cannot preempt JavaScript that is currently executing synchronously; it marks the process terminated and prevents subsequent guarded DOM operations.
+This is a best-effort statement budget, not a hard execution timeout. It cannot interrupt a single long-running expression, a blocking native call, or hostile code that bypasses the instrumented paths. Because code runs on the main thread, code can still block until the next injected check. terminate() cannot preempt JavaScript that is currently executing synchronously; it marks the process terminated and prevents subsequent guarded DOM operations.
 
 ## Security limitations
 
