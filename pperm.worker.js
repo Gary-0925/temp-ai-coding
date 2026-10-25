@@ -228,7 +228,7 @@ self.addEventListener("message", async ({ data }) => {
 				composedPath() { return [this.target, this.currentTarget].filter(Boolean); }
 			};
 			try {
-				entry.callback.call(revive(entry.reference), event);
+				entry.callback.call(createElementProxy(entry.reference), event);
 			} catch (error) {
 				reportAsyncError(error);
 			}
