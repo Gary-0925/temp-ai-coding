@@ -175,7 +175,7 @@ function createStyleProxy(reference) {
 function createClassListProxy(reference) {
 	return new Proxy(Object.create(null), {
 		get(_, method) {
-			if (method === "length") return requestDom("get", reference, { property: "className" }).then(value => String(value ?? "").split(/\\s+/).filter(Boolean).length);
+			if (method === "length") return requestDom("get", reference, { property: "className" }).then(value => String(value ?? "").split(/\s+/).filter(Boolean).length);
 			if (method === "item") return index => requestDom("classList", reference, { method: "item", args: [index] });
 			if (method === "contains") return (...args) => requestDom("classList", reference, { method: "contains", args });
 			if (["add", "remove", "toggle", "replace", "forEach", "entries", "keys", "values"].includes(String(method))) {
