@@ -43,12 +43,15 @@ function instrumentStatements(source) {
 				);
 			if (isStatement && !node.directive) {
 				const isLabeledBody = parent?.type === "LabeledStatement" && parentKey === "body";
+				const isLabeledIteration = isLabeledBody && [
+					"ForStatement", "ForInStatement", "ForOfStatement", "WhileStatement", "DoWhileStatement"
+				].includes(node.type);
 				const isControlledBody = parent
 					&& ["consequent", "alternate", "body"].includes(parentKey)
 					&& parent.type !== "LabeledStatement";
-				if (isLabeledBody) {
-					// Keep the label attached to its original statement (especially labeled loops).
-				} else if (isControlledBody) {
+				if (isLabeledIteration) {
+					// Keep labels attached to loop statements so continue label remains valid.
+				} else if (isControlledBody || isLabeledBody) {
 					add(node.start, "{" + guardedName + "();");
 					add(node.end, "}");
 				} else if (!seen.has(node.start)) {
