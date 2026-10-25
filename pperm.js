@@ -416,19 +416,12 @@ export class PpermProcess extends EventTarget {
 			root = window.document.querySelector(this.permissions.dom.root);
 			if (!root) throw new Error("DOM root not found: " + this.permissions.dom.root);
 		}
-		let checkCount = 0;
 		const check = () => {
 			if (this.#terminated) throw new DOMException("Process has been terminated", "AbortError");
-			checkCount++;
-			if (checkCount > this.#maxLoopIterations) {
-				throw new DOMException("Execution stopped: loop iteration limit exceeded", "TimeoutError");
-			}
 		};
 		this.#runtime = root ? createProcessDocument(root, check) : null;
-		this.#check = check;
 	}
 
-	#check;
 
 	async run(code) {
 		if (this.#terminated) throw new Error("Process has been terminated");
