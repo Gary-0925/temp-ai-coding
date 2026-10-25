@@ -73,7 +73,7 @@ await new Promise(resolve => {
 });
 ```
 
-The bridge maps returned DOM nodes to stable remote handles, supports node arguments for methods such as `appendChild`, and forwards common DOM events to the Worker. It supports `document.getElementById`, `getElementsByClassName`, `getElementsByTagName`, `createComment`, and `createDocumentFragment`, plus element-level `getElementsByClassName` and `getElementsByTagName`. Collection-returning helpers currently resolve to arrays of remote element proxies rather than live native `NodeList` or `HTMLCollection` objects. Event objects are snapshots/proxies rather than genuine browser `Event` instances, so methods such as `preventDefault()` cannot cancel the original event.
+The bridge maps returned DOM nodes to stable remote handles, supports node arguments for methods such as `appendChild`, and forwards common DOM events to the Worker. Structural operations that would remove or move the configured root, or insert siblings outside it, are rejected. It supports `document.getElementById`, `getElementsByClassName`, `getElementsByTagName`, `createComment`, and `createDocumentFragment`, plus element-level `getElementsByClassName` and `getElementsByTagName`. Collection-returning helpers currently resolve to arrays of remote element proxies rather than live native `NodeList` or `HTMLCollection` objects. Event objects are snapshots/proxies rather than genuine browser `Event` instances, so methods such as `preventDefault()` cannot cancel the original event.
 
 Because DOM operations cross the Worker/main-thread boundary, remote property reads and methods that return values are asynchronous; writes are queued asynchronously. This is not fully identical to synchronous browser DOM behavior.
 
