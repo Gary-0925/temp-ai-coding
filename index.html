@@ -39,7 +39,7 @@ Awaiting guest execution…</div></div></div></div></section>
 'use strict';
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
 const grants={network:false,storage:false};let db=null,guestId=0,current=null;
-const examples={hello:'console.log("Hello from CRADOS guestland!");\\nconsole.log("2 + 2 =", 2 + 2);',dom:'document.body.innerHTML = "<h2>Guest DOM works.</h2><p>This is the guest document.</p>";\\nconsole.log("Rendered in guest DOM.");',timer:'console.log("Timer started");\\nsetTimeout(() => console.log("Timer fired"), 500);'};
+const examples={hello:'console.log("Hello from CRADOS guestland!");\nconsole.log("2 + 2 =", 2 + 2);',dom:'document.body.innerHTML = "<h2>Guest DOM works.</h2><p>This is the guest document.</p>";\nconsole.log("Rendered in guest DOM.");',timer:'console.log("Timer started");\nsetTimeout(() => console.log("Timer fired"), 500);'};
 function page(n){$$('.page').forEach(x=>x.classList.toggle('hidden',x.id!==n));$$('.nav').forEach(x=>x.classList.toggle('active',x.dataset.page===n))}
 $$('[data-page]').forEach(b=>b.onclick=()=>page(b.dataset.page));
 $$('[data-jump]').forEach(b=>b.onclick=()=>page(b.dataset.jump));
