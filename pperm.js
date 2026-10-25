@@ -362,15 +362,17 @@ export class PpermProcess extends EventTarget {
 
 	async run(code) {
 		if (this.#terminated) throw new Error("Process has been terminated");
-		const deadline = performance.now() + this.#maxExecutionTimeMs;
 		const timeoutError = new DOMException("Execution stopped: time limit exceeded", "TimeoutError");
 		let timedOut = false;
+		let deadline;
 		const check = () => {
-			if (timedOut || performance.now() >= deadline) {
+			if (timedOut) throw timeoutError;
+			if (this.#terminated) throw new DOMException("Process has been terminated", "AbortError");
+			if (deadline !== undefined && performance.now() >= deadline) {
 				timedOut = true;
+				this.terminate();
 				throw timeoutError;
 			}
-			if (this.#terminated) throw new DOMException("Process has been terminated", "AbortError");
 		};
 		const instrumented = instrumentStatements(String(code));
 		const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
@@ -393,19 +395,6 @@ export class PpermProcess extends EventTarget {
 			network,
 			storage
 		};
-		const active = execute(
-			context.postMessage,
-			context.permissions,
-			context.document,
-			check,
-			denyIf(network.fetch, "fetch", window.fetch.bind(window)),
-			denyIf(network.webSocket, "WebSocket", window.WebSocket),
-			denyIf(network.eventSource, "EventSource", window.EventSource),
-			denyIf(network.xmlHttpRequest, "XMLHttpRequest", window.XMLHttpRequest),
-			denyIf(storage.indexedDB, "indexedDB", window.indexedDB),
-			denyIf(storage.cache, "caches", window.caches)
-		);
-		this.#active.add(active);
 		let timeoutHandle;
 		const timeout = new Promise((_, reject) => {
 			timeoutHandle = setTimeout(() => {
@@ -414,6 +403,26 @@ export class PpermProcess extends EventTarget {
 				reject(timeoutError);
 			}, this.#maxExecutionTimeMs);
 		});
+		deadline = performance.now() + this.#maxExecutionTimeMs;
+		let active;
+		try {
+			active = execute(
+				context.postMessage,
+				context.permissions,
+				context.document,
+				check,
+				denyIf(network.fetch, "fetch", window.fetch.bind(window)),
+				denyIf(network.webSocket, "WebSocket", window.WebSocket),
+				denyIf(network.eventSource, "EventSource", window.EventSource),
+				denyIf(network.xmlHttpRequest, "XMLHttpRequest", window.XMLHttpRequest),
+				denyIf(storage.indexedDB, "indexedDB", window.indexedDB),
+				denyIf(storage.cache, "caches", window.caches)
+			);
+		} catch (error) {
+			clearTimeout(timeoutHandle);
+			throw error;
+		}
+		this.#active.add(active);
 		try {
 			const result = await Promise.race([
 				active,
