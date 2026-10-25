@@ -1,13 +1,14 @@
 # pperm.js
 
-A browser library for creating JavaScript processes backed by dedicated Web Workers.
+A small browser JavaScript runner with synchronous DOM access and configurable prototype-level permissions.
 
 ## Usage
 
-```js
+~~~js
 import pperm from "./pperm.js";
 
 const process = pperm.create({
+	maxLoopIterations: 100000,
 	permissions: {
 		network: {
 			fetch: true,
@@ -28,57 +29,47 @@ const process = pperm.create({
 
 process.addEventListener("message", event => console.log(event.detail));
 
-const result = await process.run(`
-	document.body.textContent = "Hello!";
-	const button = await document.createElement("button");
-	button.textContent = "Click me";
-	await document.body.appendChild(button);
-
-	await new Promise(resolve => {
-		button.addEventListener("click", resolve, { once: true });
-	});
-	return await document.querySelector("button").textContent;
-`);
+const result = await process.run(
+	'document.body.textContent = "Hello!";' +
+	'const button = document.createElement("button");' +
+	'button.textContent = "Click me";' +
+	'button.style.backgroundColor = "black";' +
+	'document.body.appendChild(button);' +
+	'await new Promise(resolve => button.addEventListener("click", resolve, { once: true }));' +
+	'return document.querySelector("button").textContent;'
+);
 
 console.log(result);
 process.terminate();
-```
+~~~
+
+DOM operations are synchronous, so DOM access and mutation do not require await. process.run() is asynchronous because user code may itself use await.
 
 ## API
 
-- `pperm.create({ permissions })` creates a worker-backed process.
-- `process.run(code)` executes JavaScript and resolves with its completion value.
-- `process.postMessage(value)` sends a message to the worker.
-- `process.terminate()` terminates the worker.
-- `message`, `error`, `exit`, and `terminate` events report process activity.
+- pperm.create({ permissions, maxLoopIterations }) creates a process runner.
+- process.run(code) executes JavaScript and resolves with its completion value.
+- process.postMessage(value) dispatches a message event on the process.
+- process.terminate() marks the process as terminated, removes its registered DOM listeners, and makes later guarded operations fail.
+- message, error, and terminate events report process activity.
+- process.terminated indicates whether termination has been requested.
 
 ## Permissions
 
-Network permissions can be configured independently: `network.fetch`, `network.webSocket`, `network.eventSource`, and `network.xmlHttpRequest`.
+Network permissions: network.fetch, network.webSocket, network.eventSource, and network.xmlHttpRequest.
 
-Storage permissions: `storage.indexedDB` and `storage.cache`.
+Storage permissions: storage.indexedDB and storage.cache.
 
-DOM is disabled by default. Enable `dom.enabled` and set `dom.root` to the selector for the element exposed as the process's `document.body`. Within that root, the process can use familiar DOM expressions, including node creation/insertion and event listeners:
+DOM is disabled by default. Enable dom.enabled and set dom.root to the selector for the element exposed as the process's document.body. DOM queries are scoped to that root, and the bridge blocks common operations that would remove/move the root or insert siblings outside it.
 
-```js
-document.body.textContent = "Hello";
+The bridge supports document.querySelector, querySelectorAll, getElementById, getElementsByClassName, getElementsByTagName, createElement, createTextNode, createComment, createDocumentFragment, activeElement, and common element methods, properties, styles, class lists, and event listeners. Collection-returning helpers return arrays rather than live native NodeList or HTMLCollection objects.
 
-const button = await document.createElement("button");
-button.textContent = "Click me";
-button.style.backgroundColor = "black";
-await document.body.appendChild(button);
+## Preventing runaway loops
 
-await new Promise(resolve => {
-	button.addEventListener("click", resolve, { once: true });
-});
-```
+The runner instruments while conditions, classic for conditions, and for...of, for await...of, and for...in iteration. Each process run has a shared loop-check budget, controlled by maxLoopIterations (default: 100000). When the budget is exceeded, the run throws a TimeoutError instead of continuing an unbounded loop.
 
-The bridge maps returned DOM nodes to stable remote handles, supports node arguments for methods such as `appendChild`, and forwards common DOM events to the Worker. Structural operations that would remove or move the configured root, or insert siblings outside it, are rejected. It supports `document.getElementById`, `getElementsByClassName`, `getElementsByTagName`, `createComment`, and `createDocumentFragment`, plus element-level `getElementsByClassName` and `getElementsByTagName`. Collection-returning helpers currently resolve to arrays of remote element proxies rather than live native `NodeList` or `HTMLCollection` objects. Event objects are snapshots/proxies rather than genuine browser `Event` instances, so methods such as `preventDefault()` cannot cancel the original event.
+This is a best-effort guard, not a hard execution timeout. It cannot interrupt a single long-running operation, every possible source-code construct, or hostile code that bypasses the instrumented paths. Because code runs on the main thread, a loop can still block the page until a guard check is reached. terminate() cannot preempt JavaScript that is currently executing synchronously; it marks the process terminated and prevents subsequent guarded DOM operations.
 
-Because DOM operations cross the Worker/main-thread boundary, remote property reads and methods that return values are asynchronous; writes are queued asynchronously. This is not fully identical to synchronous browser DOM behavior.
+## Security limitations
 
-## Runtime model and limitations
-
-Each process runs in a dedicated Worker, so synchronous infinite loops do not block the page's main JavaScript thread. Workers do not have a native `document`; the `document` object exposed to process code is a proxy that forwards supported operations to the configured root element in the main thread.
-
-This is a prototype permission layer, not a hardened security boundary. Hiding or replacing browser globals in a Worker cannot reliably isolate hostile JavaScript, and some globals are read-only or non-configurable. Do not run hostile code with this prototype.
+This library does not provide a hardened sandbox. User code executes on the page's main thread and can access globals such as globalThis, potentially bypassing the prototype-level network/storage restrictions. Do not execute untrusted or hostile code with this library. For strong isolation and preemptive termination, execution must be moved to a separate execution context such as a Worker, which cannot provide synchronous access to the page's native DOM.
