@@ -4,6 +4,9 @@
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<meta name="color-scheme" content="dark light">
+		<script type="importmap">
+			{"imports":{"acorn":"https://esm.sh/acorn@8.15.0"}}
+		</script>
 		<title>pperm.js Playground</title>
 		<style>
 			:root {
@@ -241,7 +244,7 @@ await new Promise(resolve => {
 		</main>
 
 		<script type="module">
-			import pperm from "./pperm.js?v=20261025-7";
+			import pperm from "./pperm.js?v=20261025-8";
 
 			const editor = document.querySelector("#editor");
 			const output = document.querySelector("#output");
