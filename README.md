@@ -47,7 +47,7 @@ DOM operations are synchronous, so DOM access and mutation do not require await.
 
 ## API
 
-- pperm.create({ permissions, maxStatements }) creates a process runner.
+- pperm.create({ permissions, maxExecutionTimeMs }) creates a process runner. The time limit defaults to 10000 ms.
 - process.run(code) executes JavaScript and resolves with its completion value.
 - process.postMessage(value) dispatches a message event on the process.
 - process.terminate() marks the process as terminated, removes its registered DOM listeners, and makes later guarded operations fail.
@@ -64,11 +64,11 @@ DOM is disabled by default. Enable dom.enabled and set dom.root to the selector 
 
 The bridge supports document.querySelector, querySelectorAll, getElementById, getElementsByClassName, getElementsByTagName, createElement, createTextNode, createComment, createDocumentFragment, activeElement, and common element methods, properties, styles, class lists, and event listeners. Collection-returning helpers return arrays rather than live native NodeList or HTMLCollection objects.
 
-## Statement budget
+## Execution time limit
 
-Before execution, Acorn parses the code and the runner inserts a budget check at each executable statement and at each block entry. Acorn is declared as an npm dependency; the standalone Playground resolves it through an import map to esm.sh. The per-run budget is controlled by maxStatements (default: 100000). maxLoopIterations remains accepted as a compatibility alias. Exceeding the budget throws a TimeoutError. This catches empty-body loops too, because entering their block or executing their empty statement consumes budget.
+Before execution, Acorn parses the code and the runner inserts a deadline check at each executable statement and block entry. Acorn is declared as an npm dependency; the standalone Playground resolves it through an import map to esm.sh. The per-run wall-clock limit is controlled by maxExecutionTimeMs (default: 10000 ms). Exceeding the deadline throws a TimeoutError. The same deadline checks catch tight loops, while a timer also ends runs waiting on asynchronous work; a timeout terminates that process and removes its registered DOM listeners.
 
-This is a best-effort statement budget, not a hard execution timeout. It cannot interrupt a single long-running expression, a blocking native call, or hostile code that bypasses the instrumented paths. Because code runs on the main thread, code can still block until the next injected check. terminate() cannot preempt JavaScript that is currently executing synchronously; it marks the process terminated and prevents subsequent guarded DOM operations.
+This is a best-effort time limit, not a hard execution sandbox. A long-running expression or blocking native call can still block the main thread until it returns to an injected check, so the timer cannot fire while the thread is blocked. Code that bypasses instrumented paths may also evade checks. For hard preemptive termination, execution needs a separate execution context such as a Worker, which cannot directly provide synchronous access to the page's native DOM.
 
 ## Security limitations
 
