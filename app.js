@@ -205,7 +205,7 @@ function validFileName(name) {
 	return Boolean(name) && !name.includes('/') && name !== '.' && name !== '..';
 }
 
-async function handleRpc(message) {
+async function handleRpc(message, guest) {
 	const { id, cap, action, args = {} } = message.payload || {};
 	let value;
 
@@ -271,9 +271,9 @@ async function handleRpc(message) {
 			throw new Error('未知权限或操作。');
 		}
 
-		activeGuest.frame.contentWindow.postMessage({
+		guest.frame.contentWindow.postMessage({
 			tag: 'crados',
-			gid: activeGuest.id,
+			gid: guest.id,
 			type: 'result',
 			payload: { id, ok: true, value }
 		}, '*');
@@ -306,7 +306,7 @@ function handleMessage(event) {
 	} else if (data.type === 'log' || data.type === 'error') {
 		log(`[guest${data.type === 'error' ? ' error' : ''}] ${data.payload}`);
 	} else if (data.type === 'rpc') {
-		handleRpc(data);
+		handleRpc(data, activeGuest);
 	}
 }
 
