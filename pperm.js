@@ -274,7 +274,7 @@ export class PpermProcess extends EventTarget {
 					if (isRootTarget && methodName === "insertAdjacentHTML" && ["beforebegin", "afterend"].includes(String(methodArgs[0]).toLowerCase())) {
 						throw new DOMException("Content cannot be inserted outside the permitted DOM root", "NotAllowedError");
 					}
-					if (isRootTarget && methodName === "insertAdjacentElement" && ["beforebegin", "afterend"].includes(String(methodArgs[0]).toLowerCase())) {
+					if (isRootTarget && ["insertAdjacentElement", "insertAdjacentText"].includes(methodName) && ["beforebegin", "afterend"].includes(String(methodArgs[0]).toLowerCase())) {
 						throw new DOMException("Content cannot be inserted outside the permitted DOM root", "NotAllowedError");
 					}
 					const method = target[methodName];
