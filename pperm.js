@@ -130,7 +130,7 @@ export class PpermProcess extends EventTarget {
 			const allowedNode = node => node && (
 				node === root ||
 				root.contains(node) ||
-				this.#domNodes.has(this.#domNodeIds.get(node))
+				(!node.isConnected && this.#domNodes.has(this.#domNodeIds.get(node)))
 			);
 
 			const serialize = value => {
