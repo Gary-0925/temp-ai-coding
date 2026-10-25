@@ -147,7 +147,11 @@ export class PpermProcess extends EventTarget {
 				if (value instanceof NodeList || value instanceof HTMLCollection) {
 					return Array.from(value, serialize);
 				}
+				if (value && typeof value.length === "number" && typeof value.item === "function") {
+					return Array.from(value, serialize);
+				}
 				if (Array.isArray(value)) return value.map(serialize);
+				if (value && typeof value.toJSON === "function") return serialize(value.toJSON());
 				if (value && Object.getPrototypeOf(value) === Object.prototype) {
 					return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, serialize(item)]));
 				}
@@ -238,7 +242,14 @@ export class PpermProcess extends EventTarget {
 					const method = target[args.method];
 					if (typeof method !== "function") throw new Error("Unknown DOM method: " + args.method);
 					const result = method.apply(target, deserialize(args.args ?? []));
-					value = result instanceof Node ? serialize(result) : serialize(result);
+					if (result instanceof Node && args.method === "cloneNode") {
+						const registerTree = node => {
+							nodeId(node);
+							for (const child of node.childNodes ?? []) registerTree(child);
+						};
+						registerTree(result);
+					}
+					value = serialize(result);
 					break;
 				}
 				case "classList":
