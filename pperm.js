@@ -143,7 +143,8 @@ function instrumentLoops(source) {
 		edits.push([expressionStart, close, " " + helper + "(" + expression + ")"]);
 	}
 
-	for (let i = edits.length - 1; i >= 0; i--) {
+	edits.sort((a, b) => b[0] - a[0]);
+	for (let i = 0; i < edits.length; i++) {
 		const [start, end, replacement] = edits[i];
 		source = source.slice(0, start) + replacement + source.slice(end);
 	}
