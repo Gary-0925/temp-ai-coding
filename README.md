@@ -1,29 +1,24 @@
 # CRADOS
 
-A tiny browser-native OS experiment: JavaScript is the execution substrate; capabilities are the system interface.
+一个浏览器原生运行环境实验：使用 JavaScript 引擎执行应用，并通过权限代理提供受控系统服务。
 
-## Run locally
+## 部署
 
-Open `index.html` in a modern browser, or serve the repository root with any static HTTP server. No build step or backend is required.
+这是纯静态网站，无需构建步骤。
 
-## GitHub Pages
+1. 打开仓库的 Settings → Pages。
+2. 选择 Deploy from a branch。
+3. 选择 `clear-repo-test` 分支和 `/(root)` 目录。
+4. 保存后等待 GitHub Pages 部署完成。
 
-A GitHub Actions workflow lives at `.github/workflows/pages.yml`. It deploys the repository root when `clear-repo-test` is updated.
+## 功能
 
-- Repository: https://github.com/Gary-0925/temp-ai-coding
-- Development branch: `clear-repo-test`
-- Workflow: https://github.com/Gary-0925/temp-ai-coding/actions/workflows/pages.yml
+- 沙箱 iframe 中执行 JavaScript
+- Guest 控制台桥接
+- 可授权的 HTTPS 请求代理
+- 基于 IndexedDB 的虚拟文件
+- 本地权限设置
 
-If the first deployment does not start, check that GitHub Actions is enabled and that Pages is configured to use **GitHub Actions** in repository Settings → Pages. The repository is currently private; Pages availability depends on the repository owner's GitHub plan and repository settings.
+## 安全边界
 
-## Prototype features
-
-- Responsive OS shell
-- Sandboxed JavaScript guest iframe
-- Console bridge
-- Permission-gated HTTPS fetch bridge
-- Permission-gated IndexedDB virtual files
-
-## Security notes
-
-This is an exploratory prototype, not a hardened security boundary. Sandboxed frames and capability checks reduce accidental access but do not guarantee protection against denial of service or every browser attack. Guest scripts can consume CPU and memory. Network calls remain subject to browser CORS and mixed-content rules. Do not store secrets in the virtual file system.
+该项目是原型，不是经过安全认证的隔离环境。Guest 脚本仍可能耗尽 CPU 或内存。网络请求受浏览器 CORS 和混合内容策略限制。不要在虚拟文件中保存机密信息。
