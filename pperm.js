@@ -1,4 +1,4 @@
-const workerUrl = new URL("./pperm.worker.js?v=20261025-3", import.meta.url);
+const workerUrl = new URL("./pperm.worker.js?v=20261025-4", import.meta.url);
 
 const defaults = {
 	network: {
@@ -237,6 +237,32 @@ export class PpermProcess extends EventTarget {
 					value = serialize(node);
 					break;
 				}
+				case "createComment": {
+					const node = document.createComment(String(args.text));
+					nodeId(node);
+					value = serialize(node);
+					break;
+				}
+				case "createDocumentFragment": {
+					const node = document.createDocumentFragment();
+					nodeId(node);
+					value = serialize(node);
+					break;
+				}
+				case "getElementById": {
+					const id = String(args.id);
+					const node = root.id === id ? root : Array.from(root.querySelectorAll("[id]")).find(element => element.id === id) ?? null;
+					value = serialize(node);
+					break;
+				}
+				case "getElementsByClassName": {
+					value = Array.from(root.getElementsByClassName(String(args.className)), serialize);
+					break;
+				}
+				case "getElementsByTagName": {
+					value = Array.from(root.getElementsByTagName(String(args.tagName)), serialize);
+					break;
+				}
 				case "call": {
 					if (!target) throw new Error("DOM element not found");
 					const method = target[args.method];
@@ -301,6 +327,7 @@ export class PpermProcess extends EventTarget {
 					else if (args.property === "URL" || args.property === "documentURI") value = location.href;
 					else if (args.property === "readyState") value = document.readyState;
 					else if (args.property === "visibilityState") value = document.visibilityState;
+					else if (args.property === "activeElement") value = serialize(document.activeElement);
 					else value = undefined;
 					break;
 				default:
