@@ -66,7 +66,7 @@ The bridge supports document.querySelector, querySelectorAll, getElementById, ge
 
 ## Statement budget
 
-Before execution, Acorn parses the code and the runner inserts a budget check at each executable statement and at each block entry. The per-run budget is controlled by maxStatements (default: 100000). maxLoopIterations remains accepted as a compatibility alias. Exceeding the budget throws a TimeoutError. This catches empty-body loops too, because entering their block or executing their empty statement consumes budget.
+Before execution, Acorn parses the code and the runner inserts a budget check at each executable statement and at each block entry. Acorn is declared as an npm dependency; the standalone Playground resolves it through an import map to esm.sh. The per-run budget is controlled by maxStatements (default: 100000). maxLoopIterations remains accepted as a compatibility alias. Exceeding the budget throws a TimeoutError. This catches empty-body loops too, because entering their block or executing their empty statement consumes budget.
 
 This is a best-effort statement budget, not a hard execution timeout. It cannot interrupt a single long-running expression, a blocking native call, or hostile code that bypasses the instrumented paths. Because code runs on the main thread, code can still block until the next injected check. terminate() cannot preempt JavaScript that is currently executing synchronously; it marks the process terminated and prevents subsequent guarded DOM operations.
 
