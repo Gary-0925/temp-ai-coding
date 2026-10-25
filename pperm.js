@@ -1,4 +1,4 @@
-const workerUrl = new URL("./pperm.worker.js?v=20261025-4", import.meta.url);
+const workerUrl = new URL("./pperm.worker.js?v=20261025-5", import.meta.url);
 
 const defaults = {
 	network: {
