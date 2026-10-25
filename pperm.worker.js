@@ -89,6 +89,7 @@ const elementMethods = new Set([
 ]);
 
 function createElementProxy(reference, metadata = {}) {
+	reference ??= { nodeType: "root" };
 	const cacheKey = reference.nodeId ? "n:" + reference.nodeId : "s:" + JSON.stringify(reference);
 	if (elementProxies.has(cacheKey)) return elementProxies.get(cacheKey);
 
