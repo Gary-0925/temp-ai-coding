@@ -30,8 +30,14 @@ process.addEventListener("message", event => console.log(event.detail));
 
 const result = await process.run(`
 	document.body.textContent = "Hello!";
-	document.querySelector("#status").textContent = "Updated";
-	return await document.querySelector("#status").textContent;
+	const button = await document.createElement("button");
+	button.textContent = "Click me";
+	await document.body.appendChild(button);
+
+	await new Promise(resolve => {
+		button.addEventListener("click", resolve, { once: true });
+	});
+	return await document.querySelector("button").textContent;
 `);
 
 console.log(result);
@@ -52,15 +58,24 @@ Network permissions can be configured independently: `network.fetch`, `network.w
 
 Storage permissions: `storage.indexedDB` and `storage.cache`.
 
-DOM is disabled by default. Enable `dom.enabled` and set `dom.root` to the selector for the element exposed as the process's `document.body`. Within that root, the process can use native-style expressions such as:
+DOM is disabled by default. Enable `dom.enabled` and set `dom.root` to the selector for the element exposed as the process's `document.body`. Within that root, the process can use familiar DOM expressions, including node creation/insertion and event listeners:
 
 ```js
 document.body.textContent = "Hello";
-document.querySelector("#status").textContent = "Ready";
-document.body.style.backgroundColor = "black";
+
+const button = await document.createElement("button");
+button.textContent = "Click me";
+button.style.backgroundColor = "black";
+await document.body.appendChild(button);
+
+await new Promise(resolve => {
+	button.addEventListener("click", resolve, { once: true });
+});
 ```
 
-Because DOM operations cross the Worker/main-thread boundary, property reads return Promises and should be awaited. DOM writes are queued asynchronously. This preserves familiar property and method syntax where possible, but it is not perfectly synchronous browser DOM behavior.
+The bridge now maps returned DOM nodes to stable remote handles, supports node arguments for methods such as `appendChild`, and forwards common DOM events to the Worker. Event objects are currently snapshots/proxies rather than genuine browser `Event` instances; some APIs and collection semantics are not implemented.
+
+Because DOM operations cross the Worker/main-thread boundary, remote property reads and methods that return values are asynchronous; writes are queued asynchronously. This is not fully identical to synchronous browser DOM behavior.
 
 ## Runtime model and limitations
 
