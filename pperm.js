@@ -109,7 +109,7 @@ function topLevelParts(masked, start, end, delimiter) {
 function instrumentLoops(source) {
 	const masked = maskNonCode(source);
 	const edits = [];
-	const loopPattern = /\b(?:while|for)\s*(\()/g;
+	const loopPattern = /\b(?:while|for)(?:\s+await)?\s*(\()/g;
 	let match;
 
 	while ((match = loopPattern.exec(masked))) {
@@ -132,13 +132,14 @@ function instrumentLoops(source) {
 		}
 
 		const header = masked.slice(open + 1, close);
-		const iterator = /\b(await\s+)?[\s\S]*?\b(of|in)\b/.exec(header);
+		const iterator = /\b[\s\S]*?\b(of|in)\b/.exec(header);
 		if (!iterator) continue;
-		const operator = iterator[2];
+		const isAsyncFor = /^for\s+await\s*\(/.test(masked.slice(match.index, open + 1));
+		const operator = iterator[1];
 		const operatorAt = open + 1 + iterator.index + iterator[0].lastIndexOf(operator);
 		const expressionStart = operatorAt + operator.length;
 		const expression = source.slice(expressionStart, close).trim();
-		const helper = iterator[1] ? asyncIterableName : operator === "in" ? keysIterableName : syncIterableName;
+		const helper = isAsyncFor ? asyncIterableName : operator === "in" ? keysIterableName : syncIterableName;
 		edits.push([expressionStart, close, " " + helper + "(" + expression + ")"]);
 	}
 
@@ -405,12 +406,15 @@ export class PpermProcess extends EventTarget {
 	#active = new Set();
 	#runtime;
 	#maxLoopIterations;
+	#terminationPromise;
+	#resolveTermination;
 
 	constructor(options = {}) {
 		super();
 		const permissions = options.permissions ?? options;
 		this.permissions = Object.freeze(normalizePermissions(permissions));
 		this.#maxLoopIterations = Math.max(1, Number(options.maxLoopIterations) || 100000);
+		this.#terminationPromise = new Promise(resolve => { this.#resolveTermination = resolve; });
 		let root = null;
 		if (this.permissions.dom.enabled) {
 			root = window.document.querySelector(this.permissions.dom.root);
@@ -472,7 +476,12 @@ export class PpermProcess extends EventTarget {
 		);
 		this.#active.add(active);
 		try {
-			const result = await active;
+			const result = await Promise.race([
+				active,
+				this.#terminationPromise.then(() => {
+					throw new DOMException("Process has been terminated", "AbortError");
+				})
+			]);
 			if (this.#terminated) throw new DOMException("Process has been terminated", "AbortError");
 			return result;
 		} catch (error) {
@@ -491,6 +500,7 @@ export class PpermProcess extends EventTarget {
 	terminate() {
 		if (this.#terminated) return;
 		this.#terminated = true;
+		this.#resolveTermination();
 		this.#runtime?.terminate();
 		this.dispatchEvent(new Event("terminate"));
 	}
