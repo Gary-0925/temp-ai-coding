@@ -3,40 +3,304 @@
 	<head>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
-		<title>pperm.js</title>
+		<meta name="color-scheme" content="dark light">
+		<title>pperm.js Playground</title>
+		<style>
+			:root {
+				font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+				color: #e5e7eb;
+				background: #111318;
+				font-synthesis: none;
+			}
+
+			* {
+				box-sizing: border-box;
+			}
+
+			body {
+				max-width: 1100px;
+				margin: 0 auto;
+				padding: 40px 24px;
+			}
+
+			header {
+				margin-bottom: 28px;
+			}
+
+			h1 {
+				margin: 0 0 8px;
+				font-size: clamp(28px, 5vw, 42px);
+				letter-spacing: -0.05em;
+			}
+
+			header p, .hint {
+				color: #9ca3af;
+				line-height: 1.6;
+			}
+
+			.workspace {
+				display: grid;
+				grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.8fr);
+				gap: 16px;
+			}
+
+			.panel {
+				min-width: 0;
+				overflow: hidden;
+				border: 1px solid #30343d;
+				border-radius: 12px;
+				background: #191c23;
+			}
+
+			.panel-title {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				padding: 13px 16px;
+				border-bottom: 1px solid #30343d;
+				font-size: 13px;
+				color: #cbd5e1;
+			}
+
+			textarea {
+				display: block;
+				width: 100%;
+				min-height: 360px;
+				resize: vertical;
+				padding: 18px;
+				border: 0;
+				outline: none;
+				color: #e5e7eb;
+				background: transparent;
+				font: 14px/1.7 ui-monospace, SFMono-Regular, Consolas, monospace;
+				tab-size: 2;
+			}
+
+			.toolbar {
+				display: flex;
+				flex-wrap: wrap;
+				align-items: center;
+				gap: 12px;
+				padding: 14px 16px;
+				border-top: 1px solid #30343d;
+			}
+
+			button {
+				padding: 9px 15px;
+				border: 1px solid #414653;
+				border-radius: 8px;
+				color: #e5e7eb;
+				background: #272b35;
+				font: inherit;
+				cursor: pointer;
+			}
+
+			button.primary {
+				border-color: #818cf8;
+				color: white;
+				background: #4f46e5;
+			}
+
+			button:disabled {
+				opacity: 0.45;
+				cursor: not-allowed;
+			}
+
+			.permissions {
+				display: grid;
+				gap: 14px;
+				padding: 16px;
+			}
+
+			label {
+				display: flex;
+				align-items: center;
+				gap: 9px;
+				font-size: 14px;
+			}
+
+			input[type="checkbox"] {
+				accent-color: #818cf8;
+				width: 16px;
+				height: 16px;
+			}
+
+			.hint {
+				margin: 0;
+				font-size: 12px;
+			}
+
+			#output {
+				min-height: 180px;
+				max-height: 360px;
+				overflow: auto;
+				margin: 0;
+				padding: 16px;
+				color: #cbd5e1;
+				white-space: pre-wrap;
+				overflow-wrap: anywhere;
+				font: 13px/1.7 ui-monospace, SFMono-Regular, Consolas, monospace;
+			}
+
+			#status {
+				color: #a5b4fc;
+			}
+
+			@media (max-width: 720px) {
+				body {
+					padding: 24px 14px;
+				}
+
+				.workspace {
+					grid-template-columns: 1fr;
+				}
+
+				textarea {
+					min-height: 280px;
+				}
+			}
+		</style>
 	</head>
 	<body>
-		<h1>pperm.js</h1>
-		<p>浏览器 JavaScript Worker 进程库。</p>
-		<pre id="output"></pre>
+		<header>
+			<h1>pperm.js <span style="color:#818cf8">Playground</span></h1>
+			<p>在 Worker 进程中编写并运行 JavaScript，按需调整进程权限。</p>
+		</header>
+
+		<main class="workspace">
+			<section class="panel">
+				<div class="panel-title">
+					<span>JavaScript</span>
+					<span id="status">就绪</span>
+				</div>
+				<textarea id="editor" spellcheck="false" aria-label="JavaScript 代码编辑器">postMessage("Hello from pperm.js");
+postMessage("document: " + typeof document);
+
+const result = 6 * 7;
+postMessage("计算结果: " + result);
+
+return result;</textarea>
+				<div class="toolbar">
+					<button class="primary" id="run">运行 ▶</button>
+					<button id="stop" disabled>停止</button>
+					<button id="clear">清空输出</button>
+				</div>
+			</section>
+
+			<div>
+				<section class="panel" style="margin-bottom:16px">
+					<div class="panel-title">进程权限</div>
+					<div class="permissions">
+						<label><input id="network" type="checkbox"> 网络访问（fetch、WebSocket 等）</label>
+						<label><input id="storage" type="checkbox"> 存储访问（IndexedDB、Cache API）</label>
+						<p class="hint">权限在每次运行时应用于新建的 Worker 进程。</p>
+					</div>
+				</section>
+
+				<section class="panel">
+					<div class="panel-title">
+						<span>输出</span>
+						<span>stdout / result / error</span>
+					</div>
+					<pre id="output" aria-live="polite">等待运行。</pre>
+				</section>
+			</div>
+		</main>
+
 		<script type="module">
 			import pperm from "./pperm.js";
 
+			const editor = document.querySelector("#editor");
 			const output = document.querySelector("#output");
-			const write = value => {
-				output.textContent += String(value) + "\n";
-			};
+			const status = document.querySelector("#status");
+			const runButton = document.querySelector("#run");
+			const stopButton = document.querySelector("#stop");
+			let process = null;
 
-			const process = pperm.create({
-				permissions: {
-					network: false,
-					storage: false
+			function write(value) {
+				output.textContent += String(value) + "\n";
+			}
+
+			function setRunning(running) {
+				runButton.disabled = running;
+				stopButton.disabled = !running;
+				status.textContent = running ? "运行中" : "就绪";
+			}
+
+			function stop() {
+				if (process) {
+					process.terminate();
+					process = null;
+				}
+
+				setRunning(false);
+			}
+
+			runButton.addEventListener("click", async () => {
+				stop();
+				output.textContent = "";
+				setRunning(true);
+
+				const current = pperm.create({
+					permissions: {
+						network: document.querySelector("#network").checked,
+						storage: document.querySelector("#storage").checked
+					}
+				});
+
+				process = current;
+
+				current.addEventListener("message", event => {
+					if (process === current) {
+						write(event.detail);
+					}
+				});
+
+				current.addEventListener("error", event => {
+					if (process === current) {
+						write(event.detail?.stack ?? event.detail?.message ?? event.detail);
+					}
+				});
+
+				try {
+					const result = await current.run(editor.value);
+
+					if (process === current) {
+						write("=> " + String(result));
+					}
+				} catch (error) {
+					if (process === current) {
+						write(error?.stack ?? error?.message ?? error);
+					}
+				} finally {
+					if (process === current) {
+						current.terminate();
+						process = null;
+						setRunning(false);
+					}
 				}
 			});
 
-			process.addEventListener("message", event => write(event.detail));
-			process.addEventListener("error", event => write(event.detail.message));
+			stopButton.addEventListener("click", () => {
+				stop();
+				write("[进程已停止]");
+			});
 
-			process.run(`
-				postMessage("Hello from pperm.js");
-				postMessage("document: " + typeof document);
-				42
-			`).then(value => {
-				write("Result: " + value);
-				process.terminate();
-			}).catch(error => {
-				write(error.message);
-				process.terminate();
+			document.querySelector("#clear").addEventListener("click", () => {
+				output.textContent = "";
+			});
+
+			editor.addEventListener("keydown", event => {
+				if (event.key === "Tab") {
+					event.preventDefault();
+					const start = editor.selectionStart;
+					const end = editor.selectionEnd;
+					editor.setRangeText("\t", start, end, "end");
+				}
+
+				if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+					runButton.click();
+				}
 			});
 		</script>
 	</body>
