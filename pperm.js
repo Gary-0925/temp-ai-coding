@@ -160,6 +160,11 @@ export class PpermProcess extends EventTarget {
 					if (!node || !allowedNode(node)) throw new DOMException("DOM node is outside the permitted root", "NotAllowedError");
 					return node;
 				}
+				if (value && value.__ppermTarget === true) {
+					const node = resolveTarget(value.target);
+					if (!node) throw new DOMException("DOM target not found", "NotAllowedError");
+					return node;
+				}
 				if (Array.isArray(value)) return value.map(deserialize);
 				return value;
 			};
@@ -205,6 +210,13 @@ export class PpermProcess extends EventTarget {
 					target.style[args.property] = String(args.value);
 					value = true;
 					break;
+				case "style-method": {
+					if (!target || !target.style) throw new Error("DOM element not found");
+					const method = target.style[args.method];
+					if (typeof method !== "function") throw new Error("Unknown CSSStyleDeclaration method: " + args.method);
+					value = method.apply(target.style, args.args ?? []);
+					break;
+				}
 				case "querySelectorAll":
 					if (!target || typeof target.querySelectorAll !== "function") throw new Error("DOM element not found");
 					value = Array.from(target.querySelectorAll(args.selector), node => serialize(node));
