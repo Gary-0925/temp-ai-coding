@@ -19,9 +19,6 @@ function applyPermissions(permissions) {
 		globalThis.caches = undefined;
 	}
 
-	if (!permissions.clipboard) {
-		globalThis.navigator.clipboard = undefined;
-	}
 }
 
 self.addEventListener("message", async ({ data }) => {
