@@ -9,9 +9,9 @@ const grants = {
 };
 
 const examples = {
-	hello: 'console.log("Hello from CRADOS");\\nconsole.log("2 + 2 =", 2 + 2);',
-	dom: 'document.body.innerHTML = "<h2>Guest DOM works.</h2><p>This is the guest document.</p>";\\nconsole.log("Rendered guest DOM.");',
-	timer: 'console.log("Timer started");\\nsetTimeout(() => console.log("Timer fired"), 500);'
+	hello: 'console.log("Hello from CRADOS");\nconsole.log("2 + 2 =", 2 + 2);',
+	dom: 'document.body.innerHTML = "<h2>Guest DOM works.</h2><p>This is the guest document.</p>";\nconsole.log("Rendered guest DOM.");',
+	timer: 'console.log("Timer started");\nsetTimeout(() => console.log("Timer fired"), 500);'
 };
 
 let database;
@@ -170,7 +170,7 @@ function guestDocument(id) {
 		'});',
 		'window.addEventListener("message", event => { const data = event.data; if (!data || data.tag !== "crados" || data.gid !== gid) return; if (data.type === "result") { const item = pending.get(data.payload.id); if (item) { pending.delete(data.payload.id); data.payload.ok ? item.resolve(data.payload.value) : item.reject(Error(data.payload.error)); } } if (data.type === "execute") { try { const fn = new Function("crados", "console", "document", "setTimeout", "clearTimeout", "Promise", data.source); fn(api, guestConsole, document, setTimeout, clearTimeout, Promise); } catch (error) { guestConsole.error(error.stack || error); } } });',
 		'send("ready", {});',
-		'<\\/script></body></html>'
+		'</script></body></html>'
 	].join('');
 }
 
