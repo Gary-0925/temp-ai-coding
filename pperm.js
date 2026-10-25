@@ -55,9 +55,7 @@ export class PpermProcess extends EventTarget {
 
 		this.#worker.addEventListener("message", ({ data }) => {
 			if (data.type === "message") {
-				this.dispatchEvent(new CustomEvent("message", {
-					detail: data.value
-				}));
+				this.dispatchEvent(new CustomEvent("message", { detail: data.value }));
 				return;
 			}
 
@@ -76,7 +74,7 @@ export class PpermProcess extends EventTarget {
 
 			if (data.type === "error") {
 				const error = Object.assign(new Error(data.error.message), {
-					name: data.error.name
+					name: data.error.name ?? "Error"
 				});
 
 				if (pending) {
@@ -84,16 +82,12 @@ export class PpermProcess extends EventTarget {
 					this.#pending.delete(data.id);
 				}
 
-				this.dispatchEvent(new CustomEvent("error", {
-					detail: error
-				}));
+				this.dispatchEvent(new CustomEvent("error", { detail: error }));
 				return;
 			}
 
 			if (data.type === "exit") {
-				this.dispatchEvent(new CustomEvent("exit", {
-					detail: data.id
-				}));
+				this.dispatchEvent(new CustomEvent("exit", { detail: data.id }));
 			}
 		});
 
@@ -105,6 +99,12 @@ export class PpermProcess extends EventTarget {
 	}
 
 	#handleDomRequest(data) {
+		const reply = payload => this.#worker.postMessage({
+			type: "dom-result",
+			id: data.id,
+			...payload
+		});
+
 		try {
 			if (!this.permissions.dom.enabled) {
 				throw new DOMException("DOM permission denied", "NotAllowedError");
@@ -116,54 +116,80 @@ export class PpermProcess extends EventTarget {
 				throw new Error(`DOM root not found: ${this.permissions.dom.root}`);
 			}
 
-			const selector = String(data.args.selector ?? "");
-			const target = selector ? root.querySelector(selector) : root;
+			const resolveTarget = reference => {
+				if (!reference) return root;
+				if (reference.nodeType === "root") return root;
+
+				const parent = reference.parent ? resolveTarget(reference.parent) : root;
+				return parent?.querySelector(reference.selector) ?? null;
+			};
+
+			const target = resolveTarget(data.target);
+			const args = data.args ?? {};
 			let value;
 
 			switch (data.operation) {
-				case "querySelector":
-					value = target ? {
-						tagName: target.tagName,
-						id: target.id,
-						textContent: target.textContent
-					} : null;
-					break;
-				case "getText":
-					value = target?.textContent ?? null;
-					break;
-				case "setText":
-					if (!target) throw new Error(`DOM element not found: ${selector}`);
-					target.textContent = data.args.value;
-					value = true;
-					break;
-				case "appendText":
-					if (!target) throw new Error(`DOM element not found: ${selector}`);
-					target.append(document.createTextNode(data.args.value));
-					value = true;
-					break;
-				case "setAttribute":
-					if (!target) throw new Error(`DOM element not found: ${selector}`);
-					if (!/^[a-zA-Z_:][a-zA-Z0-9:._-]*$/.test(data.args.name)) {
-						throw new Error("Invalid attribute name");
+				case "get":
+					if (!target) throw new Error("DOM element not found");
+					value = target[args.property];
+					if (value instanceof Node) {
+						throw new Error("DOM node values are not directly transferable");
 					}
-					target.setAttribute(data.args.name, data.args.value);
+					break;
+				case "set":
+					if (!target) throw new Error("DOM element not found");
+					if (args.property === "outerHTML" || args.property === "ownerDocument") {
+						throw new DOMException("This DOM property is not permitted", "NotAllowedError");
+					}
+					target[args.property] = args.value;
 					value = true;
+					break;
+				case "style-get":
+					if (!target) throw new Error("DOM element not found");
+					value = target.style[args.property];
+					break;
+				case "style-set":
+					if (!target) throw new Error("DOM element not found");
+					target.style[args.property] = args.value;
+					value = true;
+					break;
+				case "querySelectorAll":
+					value = Array.from((target ?? root).querySelectorAll(args.selector), (element, index) => {
+						const parentRef = data.target ?? null;
+						return {
+							parent: parentRef,
+							selector: args.selector,
+							index
+						};
+					});
+					break;
+				case "call": {
+					if (!target) throw new Error("DOM element not found");
+					const method = target[args.method];
+					if (typeof method !== "function") throw new Error(`Unknown DOM method: ${args.method}`);
+					const result = method.apply(target, args.args ?? []);
+					value = result instanceof Node ? null : result;
+					break;
+				}
+				case "classList":
+					if (!target) throw new Error("DOM element not found");
+					value = target.classList[args.method](...(args.args ?? []));
+					break;
+				case "document-get":
+					if (args.property === "title") value = document.title;
+					else if (args.property === "URL" || args.property === "documentURI") value = location.href;
+					else value = undefined;
 					break;
 				default:
 					throw new Error(`Unsupported DOM operation: ${data.operation}`);
 			}
 
-			this.#worker.postMessage({
-				type: "dom-result",
-				id: data.id,
-				value
-			});
+			reply({ value });
 		} catch (error) {
-			this.#worker.postMessage({
-				type: "dom-result",
-				id: data.id,
-				error: error?.message ?? String(error)
-			});
+			reply({ error: {
+				name: error?.name ?? "Error",
+				message: error?.message ?? String(error)
+			} });
 		}
 	}
 
@@ -186,18 +212,12 @@ export class PpermProcess extends EventTarget {
 	}
 
 	postMessage(value) {
-		if (this.#terminated) {
-			throw new Error("Process has been terminated");
-		}
-
+		if (this.#terminated) throw new Error("Process has been terminated");
 		this.#worker.postMessage({ type: "message", value });
 	}
 
 	terminate() {
-		if (this.#terminated) {
-			return;
-		}
-
+		if (this.#terminated) return;
 		this.#terminated = true;
 		this.#worker.terminate();
 
