@@ -324,6 +324,11 @@ export class PpermProcess extends EventTarget {
 	terminate() {
 		if (this.#terminated) return;
 		this.#terminated = true;
+		for (const entry of this.#domListeners.values()) {
+			entry.target.removeEventListener(entry.eventType, entry.listener, entry.options);
+		}
+		this.#domListeners.clear();
+		this.#domNodes.clear();
 		this.#worker.terminate();
 
 		for (const { reject } of this.#pending.values()) {
