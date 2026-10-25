@@ -26,7 +26,14 @@ function instrumentStatements(source) {
 		if (!node || typeof node.type !== "string") return;
 
 		if (node.type === "BlockStatement" || node.type === "StaticBlock") {
-			add(node.start + 1, guardedName + "();");
+			let position = node.start + 1;
+			if (node.type === "BlockStatement") {
+				for (const statement of node.body) {
+					if (!statement.directive) break;
+					position = statement.end;
+				}
+			}
+			add(position, (position === node.start + 1 ? "" : ";") + guardedName + "();");
 		} else {
 			const isStatement = node.type.endsWith("Statement")
 				|| node.type === "FunctionDeclaration"
@@ -35,10 +42,13 @@ function instrumentStatements(source) {
 					parent && ["ForStatement", "ForInStatement", "ForOfStatement"].includes(parent.type)
 				);
 			if (isStatement && !node.directive) {
+				const isLabeledBody = parent?.type === "LabeledStatement" && parentKey === "body";
 				const isControlledBody = parent
 					&& ["consequent", "alternate", "body"].includes(parentKey)
 					&& parent.type !== "LabeledStatement";
-				if (isControlledBody) {
+				if (isLabeledBody) {
+					// Keep the label attached to its original statement (especially labeled loops).
+				} else if (isControlledBody) {
 					add(node.start, "{" + guardedName + "();");
 					add(node.end, "}");
 				} else if (!seen.has(node.start)) {
