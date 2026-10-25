@@ -3,7 +3,6 @@ const workerUrl = new URL("./pperm.worker.js", import.meta.url);
 const defaults = {
 	network: true,
 	storage: true,
-	clipboard: false
 };
 
 export class PpermProcess extends EventTarget {
