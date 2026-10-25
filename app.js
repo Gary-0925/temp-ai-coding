@@ -9,25 +9,44 @@ const grants = {
 };
 
 const examples = {
-	hello: 'console.log("Hello from CRADOS");\nconsole.log("2 + 2 =", 2 + 2);',
-	dom: 'document.body.innerHTML = "<h2>Guest DOM works.</h2><p>This is the guest document.</p>";\nconsole.log("Rendered guest DOM.");',
-	timer: 'console.log("Timer started");\nsetTimeout(() => console.log("Timer fired"), 500);'
+	hello: 'console.log("Hello from CRADOS");\\nconsole.log("2 + 2 =", 2 + 2);',
+	dom: 'document.body.innerHTML = "<h2>Guest DOM works.</h2><p>This is the guest document.</p>";\\nconsole.log("Rendered guest DOM.");',
+	timer: 'console.log("Timer started");\\nsetTimeout(() => console.log("Timer fired"), 500);'
 };
 
 let database;
 let guestSequence = 0;
 let activeGuest;
+let editingFile = null;
 
 function showPage(name) {
 	$$('.page').forEach((page) => page.classList.toggle('hidden', page.id !== name));
 	$$('.nav-button').forEach((button) => button.classList.toggle('active', button.dataset.page === name));
 }
 
+function formatValue(value) {
+	if (typeof value === 'string') {
+		return value;
+	}
+
+	try {
+		return JSON.stringify(value);
+	} catch {
+		return String(value);
+	}
+}
+
 function log(message) {
+	const output = $('#output');
 	const line = document.createElement('div');
+
 	line.textContent = message;
-	$('#output').append(line);
-	$('#output').scrollTop = $('#output').scrollHeight;
+	output.append(line);
+	output.scrollTop = output.scrollHeight;
+
+	while (output.childElementCount > 500) {
+		output.firstElementChild.remove();
+	}
 }
 
 function openDatabase() {
@@ -40,6 +59,7 @@ function openDatabase() {
 
 		request.onsuccess = () => {
 			database = request.result;
+			database.onversionchange = () => database.close();
 			resolve();
 		};
 
@@ -54,6 +74,7 @@ function requestStore(mode, action) {
 
 		request.onsuccess = () => resolve(request.result);
 		request.onerror = () => reject(request.error);
+		transaction.onabort = () => reject(transaction.error || new Error('文件事务失败。'));
 	});
 }
 
@@ -76,6 +97,25 @@ function deleteFile(name) {
 	return requestStore('readwrite', (store) => store.delete(name));
 }
 
+function validFileName(name) {
+	return typeof name === 'string' && name.trim().length > 0 && name.length <= 120 && !/[\\/\\\\\\0]/.test(name) && name !== '.' && name !== '..';
+}
+
+function showFileEditor(file = { name: '', content: '' }) {
+	editingFile = file.name || null;
+	$('#file-name').value = file.name;
+	$('#file-content').value = file.content;
+	$('#file-error').textContent = '';
+	$('#file-form').classList.remove('hidden');
+	$('#file-name').focus();
+}
+
+function closeFileEditor() {
+	editingFile = null;
+	$('#file-form').classList.add('hidden');
+	$('#file-error').textContent = '';
+}
+
 async function renderFiles() {
 	const files = await listFiles();
 	const root = $('#file-list');
@@ -88,57 +128,100 @@ async function renderFiles() {
 		return;
 	}
 
+	files.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+
 	files.forEach((file) => {
 		const row = document.createElement('div');
-		const name = document.createElement('span');
-		const open = document.createElement('button');
+		const info = document.createElement('div');
+		const title = document.createElement('strong');
+		const meta = document.createElement('small');
+		const edit = document.createElement('button');
+		const run = document.createElement('button');
+		const exportButton = document.createElement('button');
 		const remove = document.createElement('button');
 
 		row.className = 'file-row';
-		name.className = 'file-name';
-		name.textContent = `${file.name} · ${file.content.length} 字符`;
-		open.className = 'button';
-		open.textContent = '编辑';
-		open.onclick = () => editFile(file);
+		info.className = 'file-name';
+		title.textContent = file.name;
+		meta.textContent = `${file.content.length} 字符 · ${new Date(file.updated || 0).toLocaleString()}`;
+		info.append(title, meta);
+		edit.className = 'button';
+		edit.textContent = '编辑';
+		edit.addEventListener('click', () => showFileEditor(file));
+		run.className = 'button';
+		run.textContent = '打开';
+		run.addEventListener('click', () => {
+			$('#source').value = file.content;
+			showPage('runtime');
+			$('#runtime-status').textContent = `已打开：${file.name}`;
+		});
+		exportButton.className = 'button';
+		exportButton.textContent = '导出';
+		exportButton.addEventListener('click', () => downloadFile(file.name, file.content));
 		remove.className = 'button';
 		remove.textContent = '删除';
-		remove.onclick = async () => {
-			if (confirm(`确定删除 ${file.name}？`)) {
+		remove.addEventListener('click', async () => {
+			if (confirm(`确定删除「${file.name}」？`)) {
 				await deleteFile(file.name);
+				if (editingFile === file.name) {
+					closeFileEditor();
+				}
 				await renderFiles();
 			}
-		};
+		});
 
-		row.append(name, open, remove);
+		row.append(info, edit, run, exportButton, remove);
 		root.append(row);
 	});
 }
 
-async function editFile(file) {
-	const name = prompt('文件名（不能包含斜杠）', file.name);
+function downloadFile(name, content) {
+	const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+	const url = URL.createObjectURL(blob);
+	const link = document.createElement('a');
 
-	if (!name) {
+	link.href = url;
+	link.download = name;
+	link.click();
+	URL.revokeObjectURL(url);
+}
+
+async function submitFile(event) {
+	event.preventDefault();
+
+	const name = $('#file-name').value.trim();
+	const content = $('#file-content').value;
+
+	if (!validFileName(name)) {
+		$('#file-error').textContent = '文件名不能为空，且不能包含路径分隔符。';
 		return;
 	}
 
-	if (name.includes('/') || name === '.' || name === '..') {
-		alert('文件名无效。');
+	if (content.length > 1000000) {
+		$('#file-error').textContent = '文件内容不能超过 1 MB。';
 		return;
 	}
 
-	const content = prompt('文件内容', file.content);
+	if (editingFile && editingFile !== name) {
+		const existing = await readFile(name);
 
-	if (content === null) {
-		return;
+		if (existing && !confirm(`「${name}」已存在，是否覆盖？`)) {
+			return;
+		}
+
+		await deleteFile(editingFile);
 	}
 
 	await saveFile({ name, content });
+	closeFileEditor();
 	await renderFiles();
 }
 
 function loadGrants() {
 	try {
-		Object.assign(grants, JSON.parse(localStorage.getItem('crados-grants') || '{}'));
+		const saved = JSON.parse(localStorage.getItem('crados-grants') || '{}');
+		grants.network = saved.network === true;
+		grants.storage = saved.storage === true;
 	} catch {
 		grants.network = false;
 		grants.storage = false;
@@ -150,20 +233,24 @@ function loadGrants() {
 }
 
 function saveGrants() {
-	localStorage.setItem('crados-grants', JSON.stringify(grants));
+	try {
+		localStorage.setItem('crados-grants', JSON.stringify(grants));
+	} catch (error) {
+		log(`权限设置无法保存：${error.message}`);
+	}
 }
 
 function guestDocument(id) {
 	return [
 		'<!doctype html><html><head><meta charset="utf-8">',
-		'<style>body{font:13px monospace;color:#202124}</style>',
+		'<style>body{font:13px monospace;color:#222}</style>',
 		'</head><body><script>',
 		'const gid = ' + JSON.stringify(id) + ';',
 		'let sequence = 0;',
 		'const pending = new Map();',
 		'function send(type, payload) { parent.postMessage({ tag: "crados", gid, type, payload }, "*"); }',
 		'function call(cap, action, args) { return new Promise((resolve, reject) => { const id = ++sequence; pending.set(id, { resolve, reject }); send("rpc", { id, cap, action, args }); }); }',
-		'const guestConsole = { log: (...args) => send("log", args.map(String).join(" ")), error: (...args) => send("error", args.map(String).join(" ")) };',
+		'const guestConsole = { log: (...args) => send("log", args.map(value => { try { return typeof value === "string" ? value : JSON.stringify(value); } catch { return String(value); } }).join(" ")), error: (...args) => send("error", args.map(value => { try { return typeof value === "string" ? value : JSON.stringify(value); } catch { return String(value); } }).join(" ")) };',
 		'const api = Object.freeze({',
 		'fetch: (url, options = {}) => call("network", "fetch", { url: String(url), method: options.method || "GET", headers: options.headers || {}, body: options.body || "" }),',
 		'files: Object.freeze({ list: () => call("storage", "list", {}), read: name => call("storage", "read", { name: String(name) }), write: (name, content) => call("storage", "write", { name: String(name), content: String(content) }) })',
@@ -192,24 +279,40 @@ function runGuest() {
 		ready: false
 	};
 
-	$('#output').textContent = '正在启动 Guest…';
+	$('#output').replaceChildren();
+	$('#runtime-status').textContent = '正在启动';
 
 	window.setTimeout(() => {
 		if (activeGuest?.id === id && !activeGuest.ready) {
 			log('Guest 启动超时。');
+			$('#runtime-status').textContent = '启动失败';
 		}
-	}, 1500);
+	}, 2000);
 }
 
-function validFileName(name) {
-	return Boolean(name) && !name.includes('/') && name !== '.' && name !== '..';
+function sendRpcResult(guest, id, ok, payload) {
+	if (!guest?.frame.isConnected) {
+		return;
+	}
+
+	guest.frame.contentWindow.postMessage({
+		tag: 'crados',
+		gid: guest.id,
+		type: 'result',
+		payload: { id, ok, ...(ok ? { value: payload } : { error: payload }) }
+	}, '*');
 }
 
 async function handleRpc(message, guest) {
 	const { id, cap, action, args = {} } = message.payload || {};
-	let value;
 
 	try {
+		if (!Number.isSafeInteger(id)) {
+			throw new Error('无效的请求编号。');
+		}
+
+		let value;
+
 		if (cap === 'network' && action === 'fetch') {
 			if (!grants.network) {
 				throw new Error('网络权限未授权。');
@@ -217,7 +320,7 @@ async function handleRpc(message, guest) {
 
 			const url = new URL(args.url);
 
-			if (!(url.protocol === 'https:' || (url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname)))) {
+			if (!(url.protocol === 'https:' || (url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)))) {
 				throw new Error('只允许 HTTPS 或 localhost。');
 			}
 
@@ -227,17 +330,38 @@ async function handleRpc(message, guest) {
 				throw new Error('请求方法不允许。');
 			}
 
-			const response = await fetch(url, {
-				method,
-				headers: args.headers || {},
-				body: ['GET', 'HEAD'].includes(method) ? undefined : String(args.body || '')
-			});
+			const headers = new Headers();
 
-			value = {
-				status: response.status,
-				ok: response.ok,
-				body: (await response.text()).slice(0, 12000)
-			};
+			if (args.headers && typeof args.headers === 'object') {
+				Object.entries(args.headers).slice(0, 30).forEach(([key, item]) => {
+					if (typeof item === 'string' && !['cookie', 'host', 'origin', 'referer', 'content-length'].includes(key.toLowerCase())) {
+						headers.set(key, item.slice(0, 2000));
+					}
+				});
+			}
+
+			const controller = new AbortController();
+			const timeout = window.setTimeout(() => controller.abort(), 15000);
+
+			try {
+				const response = await fetch(url, {
+					method,
+					headers,
+					body: ['GET', 'HEAD'].includes(method) ? undefined : String(args.body || '').slice(0, 100000),
+					credentials: 'omit',
+					redirect: 'error',
+					signal: controller.signal
+				});
+
+				value = {
+					status: response.status,
+					ok: response.ok,
+					headers: Object.fromEntries([...response.headers].slice(0, 30)),
+					body: (await response.text()).slice(0, 20000)
+				};
+			} finally {
+				clearTimeout(timeout);
+			}
 		} else if (cap === 'storage') {
 			if (!grants.storage) {
 				throw new Error('文件权限未授权。');
@@ -257,11 +381,13 @@ async function handleRpc(message, guest) {
 					throw new Error('文件名无效。');
 				}
 
-				if (String(args.content).length > 100000) {
-					throw new Error('文件不能超过 100 KB。');
+				const content = String(args.content);
+
+				if (content.length > 1000000) {
+					throw new Error('文件不能超过 1 MB。');
 				}
 
-				await saveFile({ name: args.name, content: String(args.content) });
+				await saveFile({ name: args.name, content });
 				value = true;
 				await renderFiles();
 			} else {
@@ -271,19 +397,9 @@ async function handleRpc(message, guest) {
 			throw new Error('未知权限或操作。');
 		}
 
-		guest.frame.contentWindow.postMessage({
-			tag: 'crados',
-			gid: guest.id,
-			type: 'result',
-			payload: { id, ok: true, value }
-		}, '*');
+		sendRpcResult(guest, id, true, value);
 	} catch (error) {
-		activeGuest.frame.contentWindow.postMessage({
-			tag: 'crados',
-			gid: activeGuest.id,
-			type: 'result',
-			payload: { id, ok: false, error: error.message }
-		}, '*');
+		sendRpcResult(guest, id, false, error.message || String(error));
 	}
 }
 
@@ -296,6 +412,7 @@ function handleMessage(event) {
 
 	if (data.type === 'ready') {
 		activeGuest.ready = true;
+		$('#runtime-status').textContent = '运行中';
 		log('Guest 已就绪。');
 		activeGuest.frame.contentWindow.postMessage({
 			tag: 'crados',
@@ -310,21 +427,68 @@ function handleMessage(event) {
 	}
 }
 
-function updateClock() {
-	$('#clock').textContent = new Date().toLocaleTimeString();
+async function saveSource() {
+	const suggested = $('#runtime-status').textContent.startsWith('已打开：')
+		? $('#runtime-status').textContent.slice(4)
+		: 'main.js';
+	const name = prompt('保存为文件名', suggested);
+
+	if (name === null) {
+		return;
+	}
+
+	if (!validFileName(name)) {
+		alert('文件名无效。');
+		return;
+	}
+
+	const existing = await readFile(name);
+
+	if (existing && !confirm(`「${name}」已存在，是否覆盖？`)) {
+		return;
+	}
+
+	await saveFile({ name, content: $('#source').value });
+	await renderFiles();
+	$('#runtime-status').textContent = `已保存：${name}`;
+}
+
+async function importFile(event) {
+	const file = event.target.files?.[0];
+
+	if (!file) {
+		return;
+	}
+
+	try {
+		if (file.size > 1000000) {
+			throw new Error('导入文件不能超过 1 MB。');
+		}
+
+		const content = await file.text();
+		const existing = await readFile(file.name);
+
+		if (existing && !confirm(`「${file.name}」已存在，是否覆盖？`)) {
+			return;
+		}
+
+		await saveFile({ name: file.name, content });
+		await renderFiles();
+	} catch (error) {
+		alert(`导入失败：${error.message}`);
+	} finally {
+		event.target.value = '';
+	}
 }
 
 $$('[data-page]').forEach((button) => {
 	button.addEventListener('click', () => showPage(button.dataset.page));
 });
 
-$$('[data-open]').forEach((button) => {
-	button.addEventListener('click', () => showPage(button.dataset.open));
-});
-
 $$('[data-example]').forEach((button) => {
 	button.addEventListener('click', () => {
 		$('#source').value = examples[button.dataset.example];
+		$('#runtime-status').textContent = '示例已载入';
 		showPage('runtime');
 	});
 });
@@ -337,9 +501,15 @@ $$('[data-cap]').forEach((input) => {
 });
 
 $('#run').addEventListener('click', runGuest);
-$('#clear').addEventListener('click', () => {
-	$('#output').textContent = '';
-});
+$('#save-source').addEventListener('click', () => saveSource().catch((error) => alert(error.message)));
+$('#clear').addEventListener('click', () => $('#output').replaceChildren());
+$('#new-file').addEventListener('click', () => showFileEditor());
+$('#cancel-file').addEventListener('click', closeFileEditor);
+$('#file-form').addEventListener('submit', (event) => submitFile(event).catch((error) => {
+	$('#file-error').textContent = error.message;
+}));
+$('#import-file').addEventListener('click', () => $('#import-input').click());
+$('#import-input').addEventListener('change', importFile);
 
 $('#revoke').addEventListener('click', () => {
 	Object.keys(grants).forEach((key) => {
@@ -351,19 +521,28 @@ $('#revoke').addEventListener('click', () => {
 	saveGrants();
 });
 
-$('#new-file').addEventListener('click', () => editFile({ name: 'untitled.txt', content: '' }));
+$('#source').addEventListener('keydown', (event) => {
+	if (event.key === 'Tab') {
+		event.preventDefault();
+		const start = event.target.selectionStart;
+		const end = event.target.selectionEnd;
+		event.target.setRangeText('\t', start, end, 'end');
+	}
+});
 
 document.addEventListener('keydown', (event) => {
 	if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+		event.preventDefault();
 		runGuest();
 	}
 });
 
 window.addEventListener('message', handleMessage);
-updateClock();
-window.setInterval(updateClock, 1000);
 loadGrants();
 
 openDatabase()
 	.then(renderFiles)
-	.catch((error) => log(`文件系统初始化失败：${error.message}`));
+	.catch((error) => {
+		$('#file-list').textContent = `文件系统初始化失败：${error.message}`;
+		$('#file-count').textContent = '不可用';
+	});
