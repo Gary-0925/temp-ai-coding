@@ -265,9 +265,21 @@ export class PpermProcess extends EventTarget {
 				}
 				case "call": {
 					if (!target) throw new Error("DOM element not found");
-					const method = target[args.method];
-					if (typeof method !== "function") throw new Error("Unknown DOM method: " + args.method);
-					const result = method.apply(target, deserialize(args.args ?? []));
+					const methodName = String(args.method);
+					const isRootTarget = !data.target || data.target.nodeType === "root";
+					const methodArgs = deserialize(args.args ?? []);
+					if (isRootTarget && ["remove", "before", "after", "replaceWith"].includes(methodName)) {
+						throw new DOMException("The permitted DOM root cannot be moved or removed", "NotAllowedError");
+					}
+					if (isRootTarget && methodName === "insertAdjacentHTML" && ["beforebegin", "afterend"].includes(String(methodArgs[0]).toLowerCase())) {
+						throw new DOMException("Content cannot be inserted outside the permitted DOM root", "NotAllowedError");
+					}
+					if (isRootTarget && methodName === "insertAdjacentElement" && ["beforebegin", "afterend"].includes(String(methodArgs[0]).toLowerCase())) {
+						throw new DOMException("Content cannot be inserted outside the permitted DOM root", "NotAllowedError");
+					}
+					const method = target[methodName];
+					if (typeof method !== "function") throw new Error("Unknown DOM method: " + methodName);
+					const result = method.apply(target, methodArgs);
 					if (result instanceof Node && args.method === "cloneNode") {
 						const registerTree = node => {
 							nodeId(node);
