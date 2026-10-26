@@ -167,17 +167,9 @@ class PpermStyle {
 	set cssText(value) {
 		this.#gate.check("dom");
 		const text = String(value);
-		if (/url\s*\(|expression\s*\(|@import|-moz-binding|behavior\s*:|\\|\/\*/i.test(text)) denied("cssText");
-		const next = {};
-		for (const declaration of text.split(";")) {
-			const index = declaration.indexOf(":");
-			if (index < 0) continue;
-			const name = declaration.slice(0, index).trim().replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-			const valueText = declaration.slice(index + 1).trim();
-			if (name) { safeStyle(name, valueText); next[name] = valueText; }
-		}
-		this.#owner.styleData = next;
-		emitMutation(this.#owner, "style", { property: "cssText", value: text });
+		safeStyle("style", text);
+		this.#owner.styleData = {};
+		emitMutation(this.#owner, "styleText", { value: text });
 	}
 	get length() { this.#gate.check("dom"); return Object.keys(this.#owner.styleData).length; }
 	item(index) { this.#gate.check("dom"); const name = Object.keys(this.#owner.styleData)[Number(index)];
