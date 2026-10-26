@@ -577,31 +577,31 @@ class PpermNode {
 			}
 		});
 	}
-	get nodeValue() { this.#gate.check("dom"); return this.#data.nodeType===3||this.#data.nodeType===8?this.#data.text:null; }
-	set nodeValue(value) { this.#gate.check("dom"); if(this.#data.nodeType===3||this.#data.nodeType===8){this.#data.text=value==null?"":String(value);emitMutation(this.#data,"text",{value:this.#data.text});} }
-	get data() { this.#gate.check("dom"); return this.#data.nodeType===3||this.#data.nodeType===8?this.#data.text:null; }
-	set data(value) { this.#gate.check("dom"); if(this.#data.nodeType===3||this.#data.nodeType===8){this.#data.text=value==null?"":String(value);emitMutation(this.#data,"text",{value:this.#data.text});} }
-	get textContent() { this.#gate.check("dom"); if(this.#data.nodeType===3||this.#data.nodeType===8)return this.#data.text; return this.#data.text+this.#data.children.map(c=>new PpermNode(c,this.#gate).textContent).join(""); }
-	set textContent(value) { this.#gate.check("dom"); const d=this.#data; for(const c of d.children){c.parent=null;setConnected(c,false);} d.children=[];d.text=value==null?"":String(value);emitMutation(d,"text",{value:d.text}); }
-	get innerText() { this.#gate.check("dom"); if(this.#data.nodeType===3||this.#data.nodeType===8)return this.#data.text; return this.#data.text+this.#data.children.map(c=>new PpermNode(c,this.#gate).innerText).join(""); }
-	set innerText(value) { this.#gate.check("dom"); const d=this.#data; for(const c of d.children){c.parent=null;setConnected(c,false);} d.children=[];d.text=value==null?"":String(value);emitMutation(d,"innerText",{value:d.text}); }
+	get nodeValue() { this.#gate.check("dom"); return this.#data.nodeType === 3 || this.#data.nodeType === 8 ? this.#data.text : null; }
+	set nodeValue(value) { this.#gate.check("dom"); if(this.#data.nodeType === 3 || this.#data.nodeType === 8){this.#data.text = value == null ? "" : String(value);emitMutation(this.#data,"text",{value:this.#data.text});} }
+	get data() { this.#gate.check("dom"); return this.#data.nodeType === 3 || this.#data.nodeType === 8 ? this.#data.text : null; }
+	set data(value) { this.#gate.check("dom"); if(this.#data.nodeType === 3 || this.#data.nodeType === 8){this.#data.text = value == null ? "" : String(value);emitMutation(this.#data,"text",{value:this.#data.text});} }
+	get textContent() { this.#gate.check("dom"); if(this.#data.nodeType === 3 || this.#data.nodeType === 8)return this.#data.text; return this.#data.text + this.#data.children.map(c=>new PpermNode(c,this.#gate).textContent).join(""); }
+	set textContent(value) { this.#gate.check("dom"); const d = this.#data; for(const c of d.children){c.parent = null;setConnected(c,false);} d.children = [];d.text = value == null ? "" : String(value);emitMutation(d,"text",{value:d.text}); }
+	get innerText() { this.#gate.check("dom"); if(this.#data.nodeType === 3 || this.#data.nodeType === 8)return this.#data.text; return this.#data.text + this.#data.children.map(c=>new PpermNode(c,this.#gate).innerText).join(""); }
+	set innerText(value) { this.#gate.check("dom"); const d = this.#data; for(const c of d.children){c.parent = null;setConnected(c,false);} d.children = [];d.text = value == null ? "" : String(value);emitMutation(d,"innerText",{value:d.text}); }
 	get style() { this.#gate.check("dom"); return this.#style; }
 	get classList() { this.#gate.check("dom"); return this.#classList; }
 	get isConnected() { this.#gate.check("dom"); return this.#data.connected; }
 	get ownerDocument() { this.#gate.check("dom"); return documentProxy; }
 	get attributes() { this.#gate.check("dom"); return Object.entries(this.#data.attributes).filter(([name]) => !name.toLowerCase().startsWith("on") && !blockedAttributes.has(name.toLowerCase())).map(([name,value])=>({name,value})); }
 	get parentNode() { this.#gate.check("dom"); if (this.#data === root) return documentProxy; return this.#data.parent ? new PpermNode(this.#data.parent, this.#gate) : null; }
-	get parentElement() { this.#gate.check("dom"); return this.#data.parent?.nodeType===1?new PpermNode(this.#data.parent,this.#gate):null; }
-	get children() { this.#gate.check("dom"); return this.#data.children.filter(c=>c.nodeType===1).map(c=>new PpermNode(c,this.#gate)); }
+	get parentElement() { this.#gate.check("dom"); return this.#data.parent?.nodeType === 1 ? new PpermNode(this.#data.parent,this.#gate) : null; }
+	get children() { this.#gate.check("dom"); return this.#data.children.filter(c=>c.nodeType === 1).map(c=>new PpermNode(c,this.#gate)); }
 	get childNodes() { this.#gate.check("dom"); return this.#data.children.map(c=>new PpermNode(c,this.#gate)); }
-	get firstChild() { this.#gate.check("dom"); const c=this.#data.children[0];return c?new PpermNode(c,this.#gate):null; }
-	get lastChild() { this.#gate.check("dom"); const a=this.#data.children;return a.length?new PpermNode(a[a.length-1],this.#gate):null; }
-	get firstElementChild() { this.#gate.check("dom"); const c=this.#data.children.find(x=>x.nodeType===1);return c?new PpermNode(c,this.#gate):null; }
-	get lastElementChild() { this.#gate.check("dom"); for(let i=this.#data.children.length-1;i>=0;i--)if(this.#data.children[i].nodeType===1)return new PpermNode(this.#data.children[i],this.#gate);return null; }
-	get nextSibling() { this.#gate.check("dom"); if(!this.#data.parent)return null;const a=this.#data.parent.children,i=a.indexOf(this.#data);return a[i+1]?new PpermNode(a[i+1],this.#gate):null; }
-	get previousSibling() { this.#gate.check("dom"); if(!this.#data.parent)return null;const a=this.#data.parent.children,i=a.indexOf(this.#data);return i>0?new PpermNode(a[i-1],this.#gate):null; }
-	get nextElementSibling() { this.#gate.check("dom"); if(!this.#data.parent)return null;const a=this.#data.parent.children.filter(c=>c.nodeType===1),i=a.indexOf(this.#data);return a[i+1]?new PpermNode(a[i+1],this.#gate):null; }
-	get previousElementSibling() { this.#gate.check("dom"); if(!this.#data.parent)return null;const a=this.#data.parent.children.filter(c=>c.nodeType===1),i=a.indexOf(this.#data);return i>0?new PpermNode(a[i-1],this.#gate):null; }
+	get firstChild() { this.#gate.check("dom"); const c = this.#data.children[0];return c ? new PpermNode(c,this.#gate) : null; }
+	get lastChild() { this.#gate.check("dom"); const a = this.#data.children;return a.length ? new PpermNode(a[a.length - 1],this.#gate) : null; }
+	get firstElementChild() { this.#gate.check("dom"); const c = this.#data.children.find(x=>x.nodeType === 1);return c ? new PpermNode(c,this.#gate) : null; }
+	get lastElementChild() { this.#gate.check("dom"); for(let i = this.#data.children.length - 1;i >= 0;i--)if(this.#data.children[i].nodeType === 1)return new PpermNode(this.#data.children[i],this.#gate);return null; }
+	get nextSibling() { this.#gate.check("dom"); if(!this.#data.parent)return null;const a = this.#data.parent.children,i = a.indexOf(this.#data);return a[i + 1] ? new PpermNode(a[i + 1],this.#gate) : null; }
+	get previousSibling() { this.#gate.check("dom"); if(!this.#data.parent)return null;const a = this.#data.parent.children,i = a.indexOf(this.#data);return i > 0 ? new PpermNode(a[i - 1],this.#gate) : null; }
+	get nextElementSibling() { this.#gate.check("dom"); if(!this.#data.parent)return null;const a = this.#data.parent.children.filter(c=>c.nodeType === 1),i = a.indexOf(this.#data);return a[i + 1] ? new PpermNode(a[i + 1],this.#gate) : null; }
+	get previousElementSibling() { this.#gate.check("dom"); if(!this.#data.parent)return null;const a = this.#data.parent.children.filter(c=>c.nodeType === 1),i = a.indexOf(this.#data);return i > 0 ? new PpermNode(a[i - 1],this.#gate) : null; }
 	getRootNode(options = {}) {
 		this.#gate.check("dom");
 		if (this.#data.connected) return documentProxy;
@@ -695,20 +695,19 @@ class PpermNode {
 	get shadowRoot() { this.#gate.check("dom"); return null; }
 	get assignedSlot() { this.#gate.check("dom"); return null; }
 
-	hasChildNodes() { this.#gate.check("dom"); return this.#data.children.length>0; }
-	get href() { this.#gate.check("dom"); return this.#data.attributes.href??""; }
-	set href(value) { this.#gate.check("dom"); const text=String(value);safeAttribute("href",text);this.#data.attributes.href=text;emitMutation(this.#data,"urlProperty",{property:"href",value:text}); }
-	get src() { this.#gate.check("dom"); return this.#data.attributes.src??""; }
-	set src(value) { this.#gate.check("dom"); const text=String(value);safeAttribute("src",text);this.#data.attributes.src=text;emitMutation(this.#data,"urlProperty",{property:"src",value:text}); }
-	get poster() { this.#gate.check("dom"); return this.#data.attributes.poster??""; }
-	set poster(value) { this.#gate.check("dom"); const text=String(value);safeAttribute("poster",text);this.#data.attributes.poster=text;emitMutation(this.#data,"urlProperty",{property:"poster",value:text}); }
-	get value() { this.#gate.check("dom"); return this.#data.value??this.#data.attributes.value??""; }
-	set value(value) { this.#gate.check("dom"); if(value!==null&&(typeof value==="object"||typeof value==="function"))throw new TypeError("DOM property value must be primitive");const text=String(value);this.#data.value=text;emitMutation(this.#data,"formProperty",{property:"value",value:text}); }
+	hasChildNodes() { this.#gate.check("dom"); return this.#data.children.length > 0; }
+	get href() { this.#gate.check("dom"); return this.#data.attributes.href ?? ""; }
+	set href(value) { this.#gate.check("dom"); const text = String(value);safeAttribute("href",text);this.#data.attributes.href = text;emitMutation(this.#data,"urlProperty",{property:"href",value:text}); }
+	get src() { this.#gate.check("dom"); return this.#data.attributes.src ?? ""; }
+	set src(value) { this.#gate.check("dom"); const text = String(value);safeAttribute("src",text);this.#data.attributes.src = text;emitMutation(this.#data,"urlProperty",{property:"src",value:text}); }
+	get poster() { this.#gate.check("dom"); return this.#data.attributes.poster ?? ""; }
+	set poster(value) { this.#gate.check("dom"); const text = String(value);safeAttribute("poster",text);this.#data.attributes.poster = text;emitMutation(this.#data,"urlProperty",{property:"poster",value:text}); }
+	get value() { this.#gate.check("dom"); return this.#data.value ?? this.#data.attributes.value ?? ""; }
+	set value(value) { this.#gate.check("dom"); if(value !== null && (typeof value === "object" || typeof value === "function"))throw new TypeError("DOM property value must be primitive");const text = String(value);this.#data.value = text;emitMutation(this.#data,"formProperty",{property:"value",value:text}); }
 	get checked() { this.#gate.check("dom"); return this.#data.checked ?? Object.hasOwn(this.#data.attributes, "checked"); }
-	set checked(value) { this.#gate.check("dom"); this.#data.checked=Boolean(value);emitMutation(this.#data,"formProperty",{property:"checked",value:this.#data.checked}); }
+	set checked(value) { this.#gate.check("dom"); this.#data.checked = Boolean(value);emitMutation(this.#data,"formProperty",{property:"checked",value:this.#data.checked}); }
 	get disabled() { this.#gate.check("dom"); return this.#data.disabled ?? Object.hasOwn(this.#data.attributes, "disabled"); }
 	set disabled(value) { this.#gate.check("dom"); this.#data.disabled = Boolean(value); if (this.#data.disabled) this.#data.attributes.disabled = ""; else delete this.#data.attributes.disabled; emitMutation(this.#data, "formProperty", { property: "disabled", value: this.#data.disabled }); }
-
 	get selected() { this.#gate.check("dom"); return this.#data.selected ?? Object.hasOwn(this.#data.attributes, "selected"); }
 	set selected(value) { this.#gate.check("dom"); this.#data.selected = Boolean(value); emitMutation(this.#data, "formProperty", { property: "selected", value: this.#data.selected }); }
 	get tabIndex() { this.#gate.check("dom"); return this.#data.tabIndex ?? Number(this.#data.attributes["tabindex"] ?? 0); }
