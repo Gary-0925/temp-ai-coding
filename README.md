@@ -1,85 +1,61 @@
 # pperm.js
 
-A small browser JavaScript runner with synchronous DOM access and configurable prototype-level permissions.
+A browser JavaScript runner that executes each script in a dedicated Worker, so a tight loop can be terminated without blocking the page's main thread. DOM calls keep a synchronous-looking API, with writes sent to the main thread through a message bridge.
 
 ## Usage
 
-DOM operations are synchronous, so DOM access and mutation do not require await. process.run() is asynchronous because user code may itself use await. To run multiple scripts concurrently, create a separate process for each script and start their run() calls without awaiting one before starting the next:
-
-~~~js
+```js
 import pperm from "./pperm.js";
 
 const process = pperm.create({
 	maxExecutionTimeMs: 10000,
 	permissions: {
-		network: {
-			fetch: true,
-			webSocket: false,
-			eventSource: false,
-			xmlHttpRequest: false
-		},
-		storage: {
-			indexedDB: false,
-			cache: false
-		},
-		dom: {
-			enabled: true,
-			root: "#app"
-		}
+		network: { fetch: true, webSocket: false, eventSource: false, xmlHttpRequest: false },
+		storage: { indexedDB: false, cache: false },
+		dom: { enabled: true, root: "#app" }
 	}
 });
 
 process.addEventListener("message", event => console.log(event.detail));
-
-const result = await process.run(
-	'document.body.textContent = "Hello!";' +
-	'const button = document.createElement("button");' +
-	'button.textContent = "Click me";' +
-	'button.style.backgroundColor = "black";' +
-	'document.body.appendChild(button);' +
-	'await new Promise(resolve => button.addEventListener("click", resolve, { once: true }));' +
-	'return document.querySelector("button").textContent;'
-);
-
-console.log(result);
+const result = await process.run(`
+	document.body.textContent = "Hello!";
+	const button = document.createElement("button");
+	button.textContent = "Click me";
+	button.style.backgroundColor = "black";
+	document.body.appendChild(button);
+	await new Promise(resolve => button.addEventListener("click", resolve, { once: true }));
+	return document.querySelector("button").textContent;
+`);
 process.terminate();
+```
 
+Each process has its own Worker and can be terminated independently. Multiple calls can run concurrently:
+
+```js
 const first = pperm.create({ permissions: { dom: { enabled: false } } });
 const second = pperm.create({ permissions: { dom: { enabled: false } } });
-const results = await Promise.all([
-	first.run('postMessage("first started"); await new Promise(resolve => setTimeout(resolve, 1000)); postMessage("first finished");'),
-	second.run('postMessage("second started"); await new Promise(resolve => setTimeout(resolve, 300)); postMessage("second finished");')
-]);
-first.terminate();
+const firstRun = first.run('while (true) {}');
+const secondRun = second.run('postMessage("still responsive");');
+setTimeout(() => first.terminate(), 500);
+await Promise.allSettled([firstRun, secondRun]);
 second.terminate();
-~~~
-
+```
 
 ## API
 
-- pperm.create({ permissions, maxExecutionTimeMs }) creates a process runner. The time limit defaults to 10000 ms.
-- process.run(code) executes JavaScript and resolves with its completion value. Different process instances can run concurrently; each has its own timeout and termination state.
-- process.postMessage(value) dispatches a message event on the process.
-- process.terminate() marks the process as terminated, removes its registered DOM listeners, and makes later guarded operations fail.
-- message, error, and terminate events report process activity.
-- process.terminated indicates whether termination has been requested.
+- `pperm.create({ permissions, maxExecutionTimeMs })` creates a runner. The time limit defaults to 10000 ms.
+- `process.run(code)` runs code in a dedicated Worker and resolves with its completion value.
+- `process.postMessage(value)` dispatches a message event on the process.
+- `process.terminate()` terminates the Worker, stops further script execution, and removes registered DOM event listeners.
+- `message`, `error`, and `terminate` events report process activity.
+- `process.terminated` indicates whether termination has been requested.
 
-## Permissions
+## DOM bridge limitations
 
-Network permissions: network.fetch, network.webSocket, network.eventSource, and network.xmlHttpRequest.
+DOM is disabled by default. Enable `dom.enabled` and set `dom.root` to the element exposed as `document.body`. The Worker cannot access native DOM nodes directly. Its synchronous-looking DOM proxy uses a local mirror for reads and sends mutations to the main thread asynchronously, without requiring `await` in user code.
 
-Storage permissions: storage.indexedDB and storage.cache.
+Currently supported selectors are simple tag names, `#id`, and `.class`. The bridge supports common properties, styles, class lists, node creation, basic tree mutation, and event listeners. `innerHTML`, compound selectors, and fully transparent native DOM semantics are not supported. Because mutations are queued to the main thread, layout/computed-style reads and browser-generated values are not guaranteed to reflect the latest native DOM state.
 
-DOM is disabled by default. Enable dom.enabled and set dom.root to the selector for the element exposed as the process's document.body. DOM queries are scoped to that root, and the bridge blocks common operations that would remove/move the root or insert siblings outside it.
+## Execution and security
 
-The bridge supports document.querySelector, querySelectorAll, getElementById, getElementsByClassName, getElementsByTagName, createElement, createTextNode, createComment, createDocumentFragment, activeElement, and common element methods, properties, styles, class lists, and event listeners. Collection-returning helpers return arrays rather than live native NodeList or HTMLCollection objects.
-
-## Execution time limit
-
-Before execution, Acorn parses the code and the runner inserts a deadline check at each executable statement and block entry. Acorn is declared as an npm dependency; the standalone Playground resolves it through an import map to esm.sh. The per-run wall-clock limit is controlled by maxExecutionTimeMs (default: 10000 ms). Exceeding the deadline throws a TimeoutError. The same deadline checks catch tight loops, while a timer also ends runs waiting on asynchronous work; a timeout terminates only that process instance and removes its registered DOM listeners. Other process instances continue running.
-
-This is a best-effort time limit, not a hard execution sandbox. A long-running expression or blocking native call can still block the main thread until it returns to an injected check, so the timer cannot fire while the thread is blocked. Code that bypasses instrumented paths may also evade checks. For hard preemptive termination, execution needs a separate execution context such as a Worker, which cannot directly provide synchronous access to the page's native DOM.
-
-## Security limitations
-
-This library does not provide a hardened sandbox. User code executes on the page's main thread and can access globals such as globalThis, potentially bypassing the prototype-level network/storage restrictions. Do not execute untrusted or hostile code with this library. For strong isolation and preemptive termination, execution must be moved to a separate execution context such as a Worker, which cannot provide synchronous access to the page's native DOM.
+A dedicated Worker lets the main thread's timeout terminate a script even when the script is stuck in a synchronous infinite loop. This protects the page's main thread from user-code CPU loops, though it cannot guarantee that browser internals, expensive DOM mutations, or other browser processes never stall. Workers do not provide a hardened security sandbox: hostile code may still access Worker globals and bypass some API permission wrappers. Do not treat this library as a secure environment for arbitrary malicious code.
