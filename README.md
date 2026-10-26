@@ -8,7 +8,7 @@ A small browser JavaScript runner with synchronous DOM access and configurable p
 import pperm from "./pperm.js";
 
 const process = pperm.create({
-	maxStatements: 100000,
+	maxExecutionTimeMs: 10000,
 	permissions: {
 		network: {
 			fetch: true,
@@ -41,14 +41,23 @@ const result = await process.run(
 
 console.log(result);
 process.terminate();
+
+const first = pperm.create({ permissions: { dom: { enabled: false } } });
+const second = pperm.create({ permissions: { dom: { enabled: false } } });
+const results = await Promise.all([
+	first.run('postMessage("first started"); await new Promise(resolve => setTimeout(resolve, 1000)); postMessage("first finished");'),
+	second.run('postMessage("second started"); await new Promise(resolve => setTimeout(resolve, 300)); postMessage("second finished");')
+]);
+first.terminate();
+second.terminate();
 ~~~
 
-DOM operations are synchronous, so DOM access and mutation do not require await. process.run() is asynchronous because user code may itself use await.
+DOM operations are synchronous, so DOM access and mutation do not require await. process.run() is asynchronous because user code may itself use await. To run multiple scripts concurrently, create a separate process for each script and start their run() calls without awaiting one before starting the next:
 
 ## API
 
 - pperm.create({ permissions, maxExecutionTimeMs }) creates a process runner. The time limit defaults to 10000 ms.
-- process.run(code) executes JavaScript and resolves with its completion value.
+- process.run(code) executes JavaScript and resolves with its completion value. Different process instances can run concurrently; each has its own timeout and termination state.
 - process.postMessage(value) dispatches a message event on the process.
 - process.terminate() marks the process as terminated, removes its registered DOM listeners, and makes later guarded operations fail.
 - message, error, and terminate events report process activity.
@@ -66,7 +75,7 @@ The bridge supports document.querySelector, querySelectorAll, getElementById, ge
 
 ## Execution time limit
 
-Before execution, Acorn parses the code and the runner inserts a deadline check at each executable statement and block entry. Acorn is declared as an npm dependency; the standalone Playground resolves it through an import map to esm.sh. The per-run wall-clock limit is controlled by maxExecutionTimeMs (default: 10000 ms). Exceeding the deadline throws a TimeoutError. The same deadline checks catch tight loops, while a timer also ends runs waiting on asynchronous work; a timeout terminates that process and removes its registered DOM listeners.
+Before execution, Acorn parses the code and the runner inserts a deadline check at each executable statement and block entry. Acorn is declared as an npm dependency; the standalone Playground resolves it through an import map to esm.sh. The per-run wall-clock limit is controlled by maxExecutionTimeMs (default: 10000 ms). Exceeding the deadline throws a TimeoutError. The same deadline checks catch tight loops, while a timer also ends runs waiting on asynchronous work; a timeout terminates only that process instance and removes its registered DOM listeners. Other process instances continue running.
 
 This is a best-effort time limit, not a hard execution sandbox. A long-running expression or blocking native call can still block the main thread until it returns to an injected check, so the timer cannot fire while the thread is blocked. Code that bypasses instrumented paths may also evade checks. For hard preemptive termination, execution needs a separate execution context such as a Worker, which cannot directly provide synchronous access to the page's native DOM.
 
