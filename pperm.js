@@ -131,51 +131,144 @@ function createNativeNode(data, ids) {
 	return node;
 }
 
-function applyDomMessage(message, ids, root) {
-	const target = ids.get(message.id);
-	if (!target) throw new DOMException("Unknown DOM bridge node", "NotFoundError");
-	if (message.op === "documentTitle") {
-		document.title = message.value;
-		return;
+class DomPermissionPolicy {
+	constructor(permissions) {
+		this.permissions = permissions;
 	}
-	if (message.op === "text") target.textContent = message.value;
-	else if (message.op === "style") {
-		const property = assertSafeStyle(message.property, message.value);
+
+	check() {
+		if (!this.permissions.dom.enabled) {
+			throw new DOMException("DOM permission is not enabled", "NotAllowedError");
+		}
+	}
+
+	checkElement(name) {
+		this.check();
+		return assertSafeElementName(name);
+	}
+
+	checkAttribute(name, value) {
+		this.check();
+		return assertSafeAttribute(name, value);
+	}
+
+	checkProperty(name, value) {
+		this.check();
+		return assertSafeProperty(name, value);
+	}
+
+	checkStyle(property, value) {
+		this.check();
+		return assertSafeStyle(property, value);
+	}
+}
+
+class DomBridge {
+	constructor(permissions) {
+		this.permissions = permissions;
+		this.policy = new DomPermissionPolicy(permissions);
+	}
+
+	apply(message, ids, root) {
+		this.policy.check();
+		const target = ids.get(message.id);
+		if (!target && message.op !== "documentTitle") {
+			throw new DOMException("Unknown DOM bridge node", "NotFoundError");
+		}
+		switch (message.op) {
+			case "documentTitle": return this.setDocumentTitle(message);
+			case "text": return this.setText(target, message);
+			case "style": return this.setStyle(target, message);
+			case "attribute": return this.setAttribute(target, message);
+			case "removeAttribute": return this.removeAttribute(target, message);
+			case "property": return this.setProperty(target, message);
+			case "append": return this.appendChild(target, message, ids);
+			case "insert": return this.insertBefore(target, message, ids);
+			case "remove": return this.removeChild(target, message, ids, root);
+			case "focus": return this.focus(target);
+			case "blur": return this.blur(target);
+			default: throw new DOMException("Unsupported DOM bridge operation: " + message.op, "NotSupportedError");
+		}
+	}
+
+	setDocumentTitle(message) {
+		this.policy.check();
+		document.title = String(message.value);
+	}
+
+	setText(target, message) {
+		this.policy.check();
+		target.textContent = String(message.value);
+	}
+
+	setStyle(target, message) {
+		this.policy.check();
+		const property = this.policy.checkStyle(message.property, message.value);
 		if (property.includes("-")) {
 			if (message.value === "") target.style.removeProperty(property);
-			else target.style.setProperty(property, message.value, message.priority ?? "");
-		} else target.style[property] = message.value;
+			else target.style.setProperty(property, String(message.value), message.priority ?? "");
+		} else target.style[property] = String(message.value);
 	}
-	else if (message.op === "attribute") {
-		const name = assertSafeAttribute(message.name, message.value);
-		if (name === "style") assertSafeStyle("style", message.value);
+
+	setAttribute(target, message) {
+		this.policy.check();
+		const name = this.policy.checkAttribute(message.name, message.value);
+		if (name === "style") this.policy.checkStyle("style", message.value);
 		target.setAttribute(name, String(message.value));
 	}
-	else if (message.op === "removeAttribute") {
+
+	removeAttribute(target, message) {
+		this.policy.check();
 		const name = String(message.name).toLowerCase();
-		if (name.startsWith("on") || ["srcdoc", "nonce", "integrity", "is"].includes(name)) {
+		if (!/^[a-z_:][a-z0-9_.:-]*$/.test(name) || name.startsWith("on") ||
+			["srcdoc", "nonce", "integrity", "is", "action", "formaction"].includes(name)) {
 			throw new DOMException("Attribute is not permitted by the DOM bridge: " + name, "NotAllowedError");
 		}
 		target.removeAttribute(name);
 	}
-	else if (message.op === "property") {
-		const property = assertSafeProperty(message.property, message.value);
+
+	setProperty(target, message) {
+		this.policy.check();
+		const property = this.policy.checkProperty(message.property, message.value);
 		if (typeof message.value === "function" || (message.value !== null && typeof message.value === "object")) {
 			throw new DOMException("DOM property value must be a serializable primitive", "NotAllowedError");
 		}
 		target[property] = message.value;
 	}
-	else if (message.op === "append") target.appendChild(createNativeNode(message.child, ids));
-	else if (message.op === "insert") {
-		const before = ids.get(message.beforeId) ?? null;
-		target.insertBefore(createNativeNode(message.child, ids), before);
+
+	appendChild(target, message, ids) {
+		this.policy.check();
+		const child = createNativeNode(message.child, ids);
+		if (child === root || child.contains?.(root)) throw new DOMException("Cannot move the permitted root", "NotAllowedError");
+		target.appendChild(child);
 	}
-	else if (message.op === "remove") {
+
+	insertBefore(target, message, ids) {
+		this.policy.check();
+		const before = message.beforeId == null ? null : ids.get(message.beforeId);
+		if (message.beforeId != null && !before) throw new DOMException("Unknown reference node", "NotFoundError");
+		const child = createNativeNode(message.child, ids);
+		if (child === root || child.contains?.(root)) throw new DOMException("Cannot move the permitted root", "NotAllowedError");
+		target.insertBefore(child, before);
+	}
+
+	removeChild(target, message, ids, root) {
+		this.policy.check();
 		const child = ids.get(message.childId);
-		if (child?.parentNode === target && child !== root) target.removeChild(child);
+		if (!child || child.parentNode !== target) throw new DOMException("Node is not a child", "NotFoundError");
+		if (child === root) throw new DOMException("Cannot remove the permitted root", "NotAllowedError");
+		target.removeChild(child);
 	}
-	else if (message.op === "click") throw new DOMException("Programmatic clicks are handled inside the Worker and cannot activate host-page event delegation", "NotAllowedError");
-	else if (message.op === "focus" || message.op === "blur") target[message.op]();
+
+	focus(target) {
+		this.policy.check();
+		target.focus();
+	}
+
+	blur(target) {
+		this.policy.check();
+		target.blur();
+	}
 }
 
 export class PpermProcess extends EventTarget {
@@ -189,11 +282,13 @@ export class PpermProcess extends EventTarget {
 	#maxExecutionTimeMs;
 	#root = null;
 	#nodeIds = new Map();
+	#domBridge;
 
 	constructor(options = {}) {
 		super();
 		const permissions = options.permissions ?? options;
 		this.permissions = Object.freeze(normalizePermissions(permissions));
+		this.#domBridge = new DomBridge(this.permissions);
 		this.#maxExecutionTimeMs = Math.max(1, Number(options.maxExecutionTimeMs) || 10000);
 		this.#terminationPromise = new Promise(resolve => { this.#resolveTermination = resolve; });
 		if (this.permissions.dom.enabled) {
@@ -250,7 +345,7 @@ export class PpermProcess extends EventTarget {
 						if (message.type === "userMessage") this.dispatchEvent(new CustomEvent("message", { detail: message.value }));
 						else if (message.type === "dom") {
 							if (!this.#root) throw new DOMException("DOM permission is not enabled", "NotAllowedError");
-							applyDomMessage(message, this.#nodeIds, this.#root);
+							this.#domBridge.apply(message, this.#nodeIds, this.#root);
 							const pending = this.#pendingListeners.splice(0);
 							for (const item of pending) this.#attachListener(item);
 						} else if (message.type === "listen") this.#attachListener(message);
@@ -263,6 +358,7 @@ export class PpermProcess extends EventTarget {
 							if (!this.#root) throw new DOMException("DOM permission is not enabled", "NotAllowedError");
 							document.title = String(message.value);
 						}
+						else if (message.type === "dispatch") this.#dispatchWorkerEvent(message);
 						else if (message.type === "done") finish(null, message.value);
 						else if (message.type === "error") {
 							const error = new Error(message.error?.message ?? "Worker execution failed");
@@ -299,6 +395,35 @@ export class PpermProcess extends EventTarget {
 
 	#domListeners = [];
 	#pendingListeners = [];
+
+	#dispatchWorkerEvent(message) {
+		this.#domBridge.policy.check();
+		const target = this.#nodeIds.get(message.id);
+		if (!target || !this.#worker) throw new DOMException("Unknown event target", "NotFoundError");
+		const type = String(message.event?.type ?? "");
+		if (!type) throw new TypeError("Event type is required");
+		const path = [];
+		for (let node = target; node; node = node.parentNode) {
+			path.push(node);
+			if (!message.event?.bubbles) break;
+		}
+		for (const node of path) {
+			for (const entry of this.#domListeners) {
+				if (entry.target === node && entry.type === type) {
+					this.#worker.postMessage({
+						type: "event",
+						listenerId: entry.listenerId,
+						event: { ...message.event, targetId: target === node ? message.id : this.#findNodeId(target) }
+					});
+				}
+			}
+		}
+	}
+
+	#findNodeId(target) {
+		for (const [id, node] of this.#nodeIds) if (node === target) return id;
+		return null;
+	}
 
 	#attachListener(message) {
 		const target = this.#nodeIds.get(message.id);
