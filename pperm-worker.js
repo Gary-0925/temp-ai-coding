@@ -130,7 +130,7 @@ class PpermStyle {
 
 	get cssText() {
 		this.#gate.check("dom");
-		return Object.entries(this.#owner.styleData).map(([name, value]) => name.replace(/[A-Z]/g, c => "-" + c.toLowerCase()) + ": " + value + ";").join(" ");
+		return Object.entries(this.#owner.styleData).map(([name, value]) => (name.startsWith("--") ? name : name.replace(/[A-Z]/g, c => "-" + c.toLowerCase())) + ": " + value + ";").join(" ");
 	}
 	set cssText(value) {
 		this.#gate.check("dom");
@@ -148,22 +148,27 @@ class PpermStyle {
 		emitMutation(this.#owner, "style", { property: "cssText", value: text });
 	}
 	get length() { this.#gate.check("dom"); return Object.keys(this.#owner.styleData).length; }
-	item(index) { this.#gate.check("dom"); return Object.keys(this.#owner.styleData)[Number(index)]?.replace(/[A-Z]/g, c => "-" + c.toLowerCase()) ?? ""; }
+	item(index) { this.#gate.check("dom"); const name = Object.keys(this.#owner.styleData)[Number(index)];
+		return name == null ? "" : (name.startsWith("--") ? name : name.replace(/[A-Z]/g, c => "-" + c.toLowerCase())); }
 	setProperty(name, value, priority = "") {
 		this.#gate.check("dom");
 		const property = safeStyle(name, value);
 		const cssValue = String(value);
-		this.#owner.styleData[property.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = cssValue;
+		const key = property.startsWith("--") ? property : property.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+		this.#owner.styleData[key] = cssValue;
 		emitMutation(this.#owner, "style", { property, value: cssValue, priority: String(priority) });
 	}
 	getPropertyValue(name) {
 		this.#gate.check("dom");
-		return this.#owner.styleData[String(name).replace(/-([a-z])/g, (_, c) => c.toUpperCase())] ?? "";
+		const property = String(name);
+		const key = property.startsWith("--") ? property : property.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+		return this.#owner.styleData[key] ?? "";
 	}
 	getPropertyPriority(name) { this.#gate.check("dom"); return ""; }
 	removeProperty(name) {
 		this.#gate.check("dom");
-		const key = String(name).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+		const property = String(name);
+		const key = property.startsWith("--") ? property : property.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 		const oldValue = this.#owner.styleData[key] ?? "";
 		delete this.#owner.styleData[key];
 		emitMutation(this.#owner, "style", { property: String(name), value: "" });
