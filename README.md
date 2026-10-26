@@ -56,6 +56,12 @@ DOM is disabled by default. Enable `dom.enabled` and set `dom.root` to the eleme
 
 Currently supported selectors are simple tag names, `#id`, and `.class`. The bridge supports common reflected properties, style assignments and `setProperty`/`getPropertyValue`/`removeProperty`, class lists, text nodes, document fragments, node cloning, `append`/`prepend`/`insertBefore`/`replaceChild`, basic tree mutation, and event listeners. `innerHTML`, compound selectors, and fully transparent native DOM semantics are not supported. Because mutations are queued to the main thread, layout/computed-style reads and browser-generated values are not guaranteed to reflect the latest native DOM state.
 
+## DOM write restrictions
+
+The DOM bridge rejects inline event-handler attributes and properties such as `onclick`, `onerror`, and `onload`; executable HTML sinks such as `innerHTML` and `outerHTML`; dangerous URL schemes; resource-loading CSS; and active element types such as `script`, `iframe`, and custom elements. The main thread repeats these checks rather than trusting Worker messages, since code running in a Worker can call its global `postMessage` directly.
+
+Use `addEventListener()` for supported event callbacks. This does not make the library a hardened sandbox: scripts can still use browser capabilities exposed by the Worker, and interacting with an existing page can trigger that page's own event handlers or application behavior. Only enable DOM access for a dedicated, low-trust container, not a privileged application UI.
+
 ## Execution and security
 
 A dedicated Worker lets the main thread's timeout terminate a script even when the script is stuck in a synchronous infinite loop. This protects the page's main thread from user-code CPU loops, though it cannot guarantee that browser internals, expensive DOM mutations, or other browser processes never stall. Workers do not provide a hardened security sandbox: hostile code may still access Worker globals and bypass some API permission wrappers. Do not treat this library as a secure environment for arbitrary malicious code.
