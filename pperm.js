@@ -407,17 +407,25 @@ export class PpermProcess extends EventTarget {
 			path.push(node);
 			if (!message.event?.bubbles) break;
 		}
-		for (const node of path) {
-			for (const entry of this.#domListeners) {
-				if (entry.target === node && entry.type === type) {
-					this.#worker.postMessage({
-						type: "event",
-						listenerId: entry.listenerId,
-						event: { ...message.event, targetId: target === node ? message.id : this.#findNodeId(target) }
-					});
+		const eventData = {
+			...message.event,
+			type,
+			targetId: message.id,
+			bubbles: !!message.event?.bubbles,
+			cancelable: !!message.event?.cancelable
+		};
+		const deliver = (node, capture) => {
+			for (const entry of [...this.#domListeners]) {
+				if (entry.target !== node || entry.type !== type || !!entry.capture !== capture) continue;
+				this.#worker?.postMessage({ type: "event", listenerId: entry.listenerId, event: eventData });
+				if (entry.once) {
+					entry.target.removeEventListener(entry.type, entry.handler, { capture: !!entry.capture });
+					this.#domListeners = this.#domListeners.filter(item => item !== entry);
 				}
 			}
-		}
+		};
+		for (const node of [...path].reverse()) deliver(node, true);
+		for (const node of path) deliver(node, false);
 	}
 
 	#findNodeId(target) {
@@ -445,8 +453,8 @@ export class PpermProcess extends EventTarget {
 				}
 			});
 		};
-		target.addEventListener(message.eventType, handler, { once: !!message.once });
-		this.#domListeners.push({ target, type: message.eventType, handler, listenerId: message.listenerId });
+		target.addEventListener(message.eventType, handler, { once: !!message.once, capture: !!message.capture });
+		this.#domListeners.push({ target, type: message.eventType, handler, listenerId: message.listenerId, once: !!message.once, capture: !!message.capture });
 	}
 
 	postMessage(value) {
