@@ -1442,69 +1442,8 @@ class PpermDocument {
 		return out;
 	}
 
-	_get(property) {
-		this._gate.check("dom");
-		switch (property) {
-			case "body": case "documentElement": return new PpermNode(root, this._gate);
-			case "nodeType": return 9;
-			case "title": return "";
-			case "querySelector": return selector => this.querySelector(selector);
-			case "querySelectorAll": return selector => this.querySelectorAll(selector);
-			case "getElementById": return id => this.querySelector("#" + String(id));
-			case "getElementsByClassName": return name => this.querySelectorAll("." + String(name).trim().split(/\s+/)[0]);
-			case "getElementsByTagName": return name => this.querySelectorAll(String(name));
-			case "createElement": return tag => this.createElement(tag);
-			case "createTextNode": return text => this.createTextNode(text);
-			case "createComment": return text => this.createComment(text);
-			case "createDocumentFragment": return () => this.createDocumentFragment();
-			case "createEvent": return () => { this._gate.check("dom"); throw new DOMException("Use dispatchEvent with an Event-like object", "NotSupportedError"); };
-			case "addEventListener": return (type, callback, options) => this.body.addEventListener(type, callback, options);
-			case "removeEventListener": return (type, callback, options) => this.body.removeEventListener(type, callback, options);
-			default: return undefined;
-		}
-	}
-
-	querySelector(selector) {
-		this._gate.check("dom");
-		return this.querySelectorAll(selector)[0] ?? null;
-	}
-
-	querySelectorAll(selector) {
-		this._gate.check("dom");
-		const out = [];
-		const walk = data => {
-			if (selectorMatches(data, selector)) out.push(new PpermNode(data, this._gate));
-			data.children.forEach(walk);
-		};
-		walk(root);
-		return out;
-	}
-
-	createElement(tagName, options) {
-		this._gate.check("dom");
-		if (options != null) throw new DOMException("Customized built-in elements are not supported", "NotSupportedError");
-		const tag = safeElementName(tagName);
-		return new PpermNode(makeData({ tagName: tag.toUpperCase(), connected: false }), this._gate);
-	}
-
-	createTextNode(text) {
-		this._gate.check("dom");
-		return new PpermNode(makeData({ nodeType: 3, tagName: "#text", text: String(text), connected: false }), this._gate);
-	}
-
-	createComment(text) {
-		this._gate.check("dom");
-		return new PpermNode(makeData({ nodeType: 8, tagName: "#comment", text: String(text), connected: false }), this._gate);
-	}
-
-	createDocumentFragment() {
-		this._gate.check("dom");
-		return new PpermNode(makeData({ nodeType: 11, tagName: "#fragment", connected: false }), this._gate);
-	}
 }
-") + '"]');
-	}
-}
+
 function errorPayload(error) {
 	return { name: error?.name ?? "Error", message: error?.message ?? String(error), stack: error?.stack };
 }
