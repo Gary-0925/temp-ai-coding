@@ -47,9 +47,9 @@ function assertSafeAttribute(name, value) {
 		throw new DOMException("Attribute is not permitted by the DOM bridge: " + name, "NotAllowedError");
 	}
 	if (urlAttributeNames.has(name)) {
-		const url = String(value).trim().replace(/[\\u0000-\\u0020]+/g, "");
+		const url = String(value).trim().replace(/[\u0000-\u0020]+/g, "");
 		if (/^(javascript|vbscript):/i.test(url) ||
-			/^data:(text\\/html|application\\/xhtml\\+xml)/i.test(url)) {
+			/^data:(text\/html|application\/xhtml\+xml)/i.test(url)) {
 			throw new DOMException("Executable URLs are not permitted by the DOM bridge", "NotAllowedError");
 		}
 	}
@@ -61,10 +61,16 @@ function assertSafeProperty(name, value) {
 	if (!safePropertyNames.has(name)) {
 		throw new DOMException("DOM property is not permitted by the bridge: " + name, "NotAllowedError");
 	}
-	if (name === "href" || name === "src") {
-		assertSafeAttribute(name, value);
-	}
+	if (name === "href" || name === "src") assertSafeAttribute(name, value);
 	return name;
+}
+
+function assertSafeStyle(property, value) {
+	const css = String(value);
+	if (/url\s*\(|expression\s*\(|@import|-moz-binding|behavior\s*:/i.test(css)) {
+		throw new DOMException("CSS resource loading and executable CSS are not permitted by the DOM bridge", "NotAllowedError");
+	}
+	return String(property);
 }
 
 function snapshotNode(node, ids, state) {
@@ -108,7 +114,9 @@ function createNativeNode(data, ids) {
 			}
 		}
 		for (const [name, value] of Object.entries(data.styleData ?? {})) {
-			try { node.style[name] = String(value); } catch {}
+			try { node.style[assertSafeStyle(name, value)] = String(value); } catch (error) {
+				if (error?.name === "NotAllowedError") throw error;
+			}
 		}
 		if (data.text) node.textContent = data.text;
 	}
@@ -126,12 +134,17 @@ function applyDomMessage(message, ids, root) {
 	}
 	if (message.op === "text") target.textContent = message.value;
 	else if (message.op === "style") {
-		if (message.property.includes("-")) {
-			if (message.value === "") target.style.removeProperty(message.property);
-			else target.style.setProperty(message.property, message.value, message.priority ?? "");
-		} else target.style[message.property] = message.value;
+		const property = assertSafeStyle(message.property, message.value);
+		if (property.includes("-")) {
+			if (message.value === "") target.style.removeProperty(property);
+			else target.style.setProperty(property, message.value, message.priority ?? "");
+		} else target.style[property] = message.value;
 	}
-	else if (message.op === "attribute") target.setAttribute(assertSafeAttribute(message.name, message.value), String(message.value));
+	else if (message.op === "attribute") {
+		const name = assertSafeAttribute(message.name, message.value);
+		if (name === "style") assertSafeStyle("style", message.value);
+		target.setAttribute(name, String(message.value));
+	}
 	else if (message.op === "removeAttribute") {
 		const name = String(message.name).toLowerCase();
 		if (name.startsWith("on") || ["srcdoc", "nonce", "integrity", "is"].includes(name)) {
@@ -239,7 +252,10 @@ export class PpermProcess extends EventTarget {
 								if (entry.listenerId === message.listenerId) entry.target.removeEventListener(entry.type, entry.handler);
 							}
 							this.#domListeners = this.#domListeners.filter(entry => entry.listenerId !== message.listenerId);
-						} else if (message.type === "documentTitle") document.title = message.value;
+						} else if (message.type === "documentTitle") {
+							if (!this.#root) throw new DOMException("DOM permission is not enabled", "NotAllowedError");
+							document.title = String(message.value);
+						}
 						else if (message.type === "done") finish(null, message.value);
 						else if (message.type === "error") {
 							const error = new Error(message.error?.message ?? "Worker execution failed");
