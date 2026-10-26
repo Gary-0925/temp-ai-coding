@@ -54,7 +54,7 @@ second.terminate();
 
 DOM is disabled by default. Enable `dom.enabled` and set `dom.root` to the element exposed as `document.body`. The Worker cannot access native DOM nodes directly. Its synchronous-looking DOM proxy uses a local mirror for reads and sends mutations to the main thread asynchronously, without requiring `await` in user code.
 
-Currently supported selectors are simple tag names, `#id`, and `.class`. The bridge supports common properties, styles, class lists, node creation, basic tree mutation, and event listeners. `innerHTML`, compound selectors, and fully transparent native DOM semantics are not supported. Because mutations are queued to the main thread, layout/computed-style reads and browser-generated values are not guaranteed to reflect the latest native DOM state.
+Currently supported selectors are simple tag names, `#id`, and `.class`. The bridge supports common reflected properties, style assignments and `setProperty`/`getPropertyValue`/`removeProperty`, class lists, text nodes, document fragments, node cloning, `append`/`prepend`/`insertBefore`/`replaceChild`, basic tree mutation, and event listeners. `innerHTML`, compound selectors, and fully transparent native DOM semantics are not supported. Because mutations are queued to the main thread, layout/computed-style reads and browser-generated values are not guaranteed to reflect the latest native DOM state.
 
 ## Execution and security
 
