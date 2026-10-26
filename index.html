@@ -167,7 +167,7 @@
 	<body>
 		<header>
 			<h1>pperm.js <span style="color:#818cf8">Playground</span></h1>
-			<p>在主线程中异步并发运行多个 JavaScript 实例；DOM API 同步调用，每个实例独立限时。</p>
+			<p>在独立 Worker 中运行多个 JavaScript 实例；DOM API 保持无 await 的调用形式，每个实例可独立强制终止。</p>
 		</header>
 
 		<main class="workspace">
@@ -222,7 +222,7 @@ await new Promise(resolve => {
 						<label><input id="domEnabled" type="checkbox"> 允许操作指定元素</label>
 						<label for="domRoot">可操作的根元素选择器</label>
 						<input id="domRoot" value="#dom-target" aria-label="DOM 根元素选择器">
-						<p class="hint">DOM 操作同步执行，不需要为 DOM 写 await。每次点击“启动实例”都会创建一个独立进程；可重复启动并发运行，点击“停止全部”终止所有实例。每个实例默认限时 10000 毫秒。主线程中的长表达式或原生调用仍无法被强制抢占。</p>
+						<p class="hint">用户脚本在独立 Worker 中执行，主线程不会被脚本的死循环直接占住；超时后可终止该 Worker。DOM API 不需要 await，但操作通过消息队列应用到主线程，因此读取的是 Worker 内的本地 DOM 镜像；目前选择器仅支持 tag、#id、.class，innerHTML 和复杂选择器不支持。每次点击“启动实例”都会创建独立 Worker，点击“停止全部”终止全部实例。</p>
 					</div>
 				</section>
 
@@ -244,7 +244,7 @@ await new Promise(resolve => {
 		</main>
 
 		<script type="module">
-			import pperm from "./pperm.js?v=20261026-1";
+			import pperm from "./pperm.js?v=20261026-2";
 
 			const editor = document.querySelector("#editor");
 			const output = document.querySelector("#output");
