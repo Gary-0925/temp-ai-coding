@@ -497,7 +497,7 @@ class PpermNode {
 	get textContent() { this.#gate.check("dom"); if(this.#data.nodeType===3||this.#data.nodeType===8)return this.#data.text; return this.#data.text+this.#data.children.map(c=>new PpermNode(c,this.#gate).textContent).join(""); }
 	set textContent(value) { this.#gate.check("dom"); const d=this.#data; for(const c of d.children){c.parent=null;setConnected(c,false);} d.children=[];d.text=value==null?"":String(value);emitMutation(d,"text",{value:d.text}); }
 	get innerText() { this.#gate.check("dom"); if(this.#data.nodeType===3||this.#data.nodeType===8)return this.#data.text; return this.#data.text+this.#data.children.map(c=>new PpermNode(c,this.#gate).innerText).join(""); }
-	set innerText(value) { this.#gate.check("dom"); const d=this.#data; for(const c of d.children){c.parent=null;setConnected(c,false);} d.children=[];d.text=value==null?"":String(value);emitMutation(d,"text",{value:d.text}); }
+	set innerText(value) { this.#gate.check("dom"); const d=this.#data; for(const c of d.children){c.parent=null;setConnected(c,false);} d.children=[];d.text=value==null?"":String(value);emitMutation(d,"innerText",{value:d.text}); }
 	get style() { this.#gate.check("dom"); return this.#style; }
 	get classList() { this.#gate.check("dom"); return this.#classList; }
 	get isConnected() { this.#gate.check("dom"); return this.#data.connected; }
@@ -610,11 +610,11 @@ class PpermNode {
 
 	hasChildNodes() { this.#gate.check("dom"); return this.#data.children.length>0; }
 	get href() { this.#gate.check("dom"); return this.#data.attributes.href??""; }
-	set href(value) { this.#gate.check("dom"); const text=String(value);safeAttribute("href",text);this.#data.attributes.href=text;emitMutation(this.#data,"attribute",{name:"href",value:text}); }
+	set href(value) { this.#gate.check("dom"); const text=String(value);safeAttribute("href",text);this.#data.attributes.href=text;emitMutation(this.#data,"urlProperty",{property:"href",value:text}); }
 	get src() { this.#gate.check("dom"); return this.#data.attributes.src??""; }
-	set src(value) { this.#gate.check("dom"); const text=String(value);safeAttribute("src",text);this.#data.attributes.src=text;emitMutation(this.#data,"attribute",{name:"src",value:text}); }
+	set src(value) { this.#gate.check("dom"); const text=String(value);safeAttribute("src",text);this.#data.attributes.src=text;emitMutation(this.#data,"urlProperty",{property:"src",value:text}); }
 	get poster() { this.#gate.check("dom"); return this.#data.attributes.poster??""; }
-	set poster(value) { this.#gate.check("dom"); const text=String(value);safeAttribute("poster",text);this.#data.attributes.poster=text;emitMutation(this.#data,"attribute",{name:"poster",value:text}); }
+	set poster(value) { this.#gate.check("dom"); const text=String(value);safeAttribute("poster",text);this.#data.attributes.poster=text;emitMutation(this.#data,"urlProperty",{property:"poster",value:text}); }
 	get value() { this.#gate.check("dom"); return this.#data.value??this.#data.attributes.value??""; }
 	set value(value) { this.#gate.check("dom"); if(value!==null&&(typeof value==="object"||typeof value==="function"))throw new TypeError("DOM property value must be primitive");this.#data.value=value;emitMutation(this.#data,"property",{property:"value",value}); }
 	get checked() { this.#gate.check("dom"); return this.#data.checked ?? Object.hasOwn(this.#data.attributes, "checked"); }
@@ -625,29 +625,29 @@ class PpermNode {
 	get selected() { this.#gate.check("dom"); return this.#data.selected ?? Object.hasOwn(this.#data.attributes, "selected"); }
 	set selected(value) { this.#gate.check("dom"); this.#data.selected = Boolean(value); emitMutation(this.#data, "property", { property: "selected", value: this.#data.selected }); }
 	get tabIndex() { this.#gate.check("dom"); return this.#data.tabIndex ?? Number(this.#data.attributes["tabindex"] ?? 0); }
-	set tabIndex(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("tabIndex must be a finite number"); this.#data.tabIndex = number; emitMutation(this.#data, "property", { property: "tabIndex", value: number }); }
+	set tabIndex(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("tabIndex must be a finite number"); this.#data.tabIndex = number; emitMutation(this.#data, "numericProperty", { property: "tabIndex", value: number }); }
 	get width() { this.#gate.check("dom"); return this.#data.width ?? Number(this.#data.attributes["width"] ?? 0); }
-	set width(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("width must be a finite number"); this.#data.width = number; emitMutation(this.#data, "property", { property: "width", value: number }); }
+	set width(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("width must be a finite number"); this.#data.width = number; emitMutation(this.#data, "numericProperty", { property: "width", value: number }); }
 	get height() { this.#gate.check("dom"); return this.#data.height ?? Number(this.#data.attributes["height"] ?? 0); }
-	set height(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("height must be a finite number"); this.#data.height = number; emitMutation(this.#data, "property", { property: "height", value: number }); }
+	set height(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("height must be a finite number"); this.#data.height = number; emitMutation(this.#data, "numericProperty", { property: "height", value: number }); }
 	get rows() { this.#gate.check("dom"); return this.#data.rows ?? Number(this.#data.attributes["rows"] ?? 0); }
-	set rows(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("rows must be a finite number"); this.#data.rows = number; emitMutation(this.#data, "property", { property: "rows", value: number }); }
+	set rows(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("rows must be a finite number"); this.#data.rows = number; emitMutation(this.#data, "numericProperty", { property: "rows", value: number }); }
 	get cols() { this.#gate.check("dom"); return this.#data.cols ?? Number(this.#data.attributes["cols"] ?? 0); }
-	set cols(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("cols must be a finite number"); this.#data.cols = number; emitMutation(this.#data, "property", { property: "cols", value: number }); }
+	set cols(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("cols must be a finite number"); this.#data.cols = number; emitMutation(this.#data, "numericProperty", { property: "cols", value: number }); }
 	get maxLength() { this.#gate.check("dom"); return this.#data.maxLength ?? Number(this.#data.attributes["maxlength"] ?? 0); }
-	set maxLength(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("maxLength must be a finite number"); this.#data.maxLength = number; emitMutation(this.#data, "property", { property: "maxLength", value: number }); }
+	set maxLength(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("maxLength must be a finite number"); this.#data.maxLength = number; emitMutation(this.#data, "numericProperty", { property: "maxLength", value: number }); }
 	get minLength() { this.#gate.check("dom"); return this.#data.minLength ?? Number(this.#data.attributes["minlength"] ?? 0); }
-	set minLength(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("minLength must be a finite number"); this.#data.minLength = number; emitMutation(this.#data, "property", { property: "minLength", value: number }); }
+	set minLength(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("minLength must be a finite number"); this.#data.minLength = number; emitMutation(this.#data, "numericProperty", { property: "minLength", value: number }); }
 	get rowSpan() { this.#gate.check("dom"); return this.#data.rowSpan ?? Number(this.#data.attributes["rowspan"] ?? 0); }
-	set rowSpan(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("rowSpan must be a finite number"); this.#data.rowSpan = number; emitMutation(this.#data, "property", { property: "rowSpan", value: number }); }
+	set rowSpan(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("rowSpan must be a finite number"); this.#data.rowSpan = number; emitMutation(this.#data, "numericProperty", { property: "rowSpan", value: number }); }
 	get colSpan() { this.#gate.check("dom"); return this.#data.colSpan ?? Number(this.#data.attributes["colspan"] ?? 0); }
-	set colSpan(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("colSpan must be a finite number"); this.#data.colSpan = number; emitMutation(this.#data, "property", { property: "colSpan", value: number }); }
+	set colSpan(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("colSpan must be a finite number"); this.#data.colSpan = number; emitMutation(this.#data, "numericProperty", { property: "colSpan", value: number }); }
 	get size() { this.#gate.check("dom"); return this.#data.size ?? Number(this.#data.attributes["size"] ?? 0); }
-	set size(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("size must be a finite number"); this.#data.size = number; emitMutation(this.#data, "property", { property: "size", value: number }); }
+	set size(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("size must be a finite number"); this.#data.size = number; emitMutation(this.#data, "numericProperty", { property: "size", value: number }); }
 	get start() { this.#gate.check("dom"); return this.#data.start ?? Number(this.#data.attributes["start"] ?? 0); }
-	set start(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("start must be a finite number"); this.#data.start = number; emitMutation(this.#data, "property", { property: "start", value: number }); }
+	set start(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("start must be a finite number"); this.#data.start = number; emitMutation(this.#data, "numericProperty", { property: "start", value: number }); }
 	get span() { this.#gate.check("dom"); return this.#data.span ?? Number(this.#data.attributes["span"] ?? 0); }
-	set span(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("span must be a finite number"); this.#data.span = number; emitMutation(this.#data, "property", { property: "span", value: number }); }
+	set span(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("span must be a finite number"); this.#data.span = number; emitMutation(this.#data, "numericProperty", { property: "span", value: number }); }
 
 	get innerHTML() { this.#gate.check("dom"); denied("innerHTML"); }
 	set innerHTML(value) { this.#gate.check("dom"); denied("innerHTML"); }
