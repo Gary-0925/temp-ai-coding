@@ -231,7 +231,6 @@ class DomBridge {
 			case "styleRemoveProperty": return this.removeStyleProperty(target, message);
 			case "attribute": return this.setAttribute(target, message);
 			case "removeAttribute": return this.removeAttribute(target, message);
-			case "property": return this.setProperty(target, message);
 			case "formProperty": return this.setFormProperty(target, message);
 			case "reflectedProperty": return this.setReflectedProperty(target, message);
 			case "append": return this.appendChild(target, message, ids);
@@ -331,15 +330,6 @@ class DomBridge {
 			throw new DOMException("Attribute is not permitted by the DOM bridge: " + name, "NotAllowedError");
 		}
 		target.removeAttribute(name);
-	}
-
-	setProperty(target, message) {
-		this.policy.check();
-		const property = this.policy.checkProperty(message.property, message.value);
-		if (typeof message.value === "function" || (message.value !== null && typeof message.value === "object")) {
-			throw new DOMException("DOM property value must be a serializable primitive", "NotAllowedError");
-		}
-		target[property] = message.value;
 	}
 
 	setFormProperty(target, message) {
@@ -475,7 +465,7 @@ export class PpermProcess extends EventTarget {
 					snapshot = { id: 1, nodeType: 1, tagName: "BODY", idName: "", className: "", text: "", attributes: {}, styleData: {}, children: [] };
 					this.#nodeIds = new Map();
 				}
-				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-44", import.meta.url));
+				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-45", import.meta.url));
 				this.#worker.addEventListener("message", event => {
 					if (settled || this.#terminated) return;
 					const message = event.data;
