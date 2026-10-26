@@ -21,6 +21,57 @@ function build(data, parent = null) {
 	return node;
 }
 
+const blockedElementNames = new Set([
+	"script", "iframe", "frame", "frameset", "object", "embed", "applet",
+	"base", "meta", "link", "style", "svg", "math", "portal", "fencedframe",
+	"webview"
+]);
+const blockedAttributeNames = new Set(["srcdoc", "nonce", "integrity", "is", "formaction", "action"]);
+const urlAttributeNames = new Set(["href", "src", "action", "formaction", "poster", "cite", "xlink:href", "background", "data", "manifest"]);
+const safePropertyNames = new Set([
+	"value", "checked", "disabled", "title", "hidden", "name", "type",
+	"href", "src", "alt", "tabIndex", "role", "draggable", "contentEditable"
+]);
+
+function assertSafeElementName(value) {
+	const name = String(value).toLowerCase();
+	if (!/^[a-z][a-z0-9-]*$/.test(name) || name.includes("-") || blockedElementNames.has(name)) {
+		throw new DOMException("Element type is not permitted by the DOM bridge", "NotAllowedError");
+	}
+	return name;
+}
+
+function assertSafeAttribute(name, value) {
+	name = String(name).toLowerCase();
+	if (!/^[a-z_:][a-z0-9_.:-]*$/.test(name) || name.startsWith("on") || blockedAttributeNames.has(name)) {
+		throw new DOMException("Attribute is not permitted by the DOM bridge: " + name, "NotAllowedError");
+	}
+	if (urlAttributeNames.has(name)) {
+		const url = String(value).trim().replace(/[\u0000-\u0020]+/g, "");
+		if (/^(javascript|vbscript):/i.test(url) || /^data:(text\/html|application\/xhtml\+xml)/i.test(url)) {
+			throw new DOMException("Executable URLs are not permitted by the DOM bridge", "NotAllowedError");
+		}
+	}
+	return name;
+}
+
+function assertSafeProperty(name, value) {
+	name = String(name);
+	if (name.startsWith("on") || ["innerHTML", "outerHTML", "srcdoc", "insertAdjacentHTML", "setHTMLUnsafe", "setHTML"].includes(name)) {
+		throw new DOMException("Executable DOM property is not permitted by the bridge: " + name, "NotAllowedError");
+	}
+	if (safePropertyNames.has(name) && (name === "href" || name === "src")) assertSafeAttribute(name, value);
+	return name;
+}
+
+function assertSafeStyle(property, value) {
+	const css = String(value);
+	if (/url\s*\(|expression\s*\(|@import|-moz-binding|behavior\s*:/i.test(css)) {
+		throw new DOMException("CSS resource loading and executable CSS are not permitted by the DOM bridge", "NotAllowedError");
+	}
+	return String(property);
+}
+
 function matches(node, selector) {
 	if (!node || node.nodeType !== 1) return false;
 	selector = String(selector).trim();
@@ -63,7 +114,7 @@ function wrap(node) {
 	const style = new Proxy({}, {
 		get(_, key) {
 			if (key === "setProperty") return (name, value, priority = "") => {
-				const property = String(name);
+				const property = assertSafeStyle(name, value);
 				const cssValue = String(value);
 				node.styleData[property.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] = cssValue;
 				mutate("style", node, { property, value: cssValue, priority: String(priority) });
@@ -80,7 +131,7 @@ function wrap(node) {
 			return node.styleData[key] ?? "";
 		},
 		set(_, key, value) {
-			const property = String(key);
+			const property = assertSafeStyle(key, value);
 			node.styleData[property] = String(value);
 			mutate("style", node, { property, value: String(value) });
 			return true;
@@ -134,8 +185,23 @@ function wrap(node) {
 			if (p === "ownerDocument") return documentProxy;
 			if (p === "getAttribute") return name => t.attributes[String(name)] ?? null;
 			if (p === "hasAttribute") return name => Object.hasOwn(t.attributes, String(name));
-			if (p === "setAttribute") return (name, value) => { name = String(name); value = String(value); t.attributes[name] = value; if (name === "id") t.idName = value; if (name === "class") t.className = value; mutate("attribute", t, { name, value }); };
-			if (p === "removeAttribute") return name => { name = String(name); delete t.attributes[name]; if (name === "id") t.idName = ""; if (name === "class") t.className = ""; mutate("removeAttribute", t, { name }); };
+			if (p === "setAttribute") return (name, value) => {
+				name = assertSafeAttribute(name, value);
+				value = String(value);
+				t.attributes[name] = value;
+				if (name === "id") t.idName = value;
+				if (name === "class") t.className = value;
+				if (name === "style") assertSafeStyle("style", value);
+				mutate("attribute", t, { name, value });
+			};
+			if (p === "removeAttribute") return name => {
+				name = String(name).toLowerCase();
+				if (name.startsWith("on") || blockedAttributeNames.has(name)) throw new DOMException("Attribute is not permitted by the DOM bridge: " + name, "NotAllowedError");
+				delete t.attributes[name];
+				if (name === "id") t.idName = "";
+				if (name === "class") t.className = "";
+				mutate("removeAttribute", t, { name });
+			};
 			if (p === "matches") return selector => matches(t, selector);
 			if (p === "querySelector") return selector => wrap(query(selector, t)[0]);
 			if (p === "querySelectorAll") return selector => query(selector, t).map(wrap);
@@ -192,12 +258,14 @@ function wrap(node) {
 				mutate("text", t, { value: t.text });
 			}
 			else if (p === "innerHTML") throw new DOMException("innerHTML is not supported; use textContent or createElement", "NotSupportedError");
-			else if (["value", "checked", "disabled", "title", "hidden", "name", "type", "href", "src", "alt", "tabIndex", "role", "draggable", "contentEditable"].includes(String(p))) {
-				t[p] = value;
-				t.attributes[String(p).toLowerCase()] = String(value);
-				mutate("property", t, { property: String(p), value });
+			else {
+				const property = assertSafeProperty(p, value);
+				if (safePropertyNames.has(property)) {
+					t[property] = value;
+					t.attributes[property.toLowerCase()] = String(value);
+					mutate("property", t, { property, value });
+				} else t[property] = value;
 			}
-			else t[p] = value;
 			return true;
 		}
 	});
@@ -267,7 +335,7 @@ const documentProxy = new Proxy({}, {
 		if (p === "getElementById") return id => wrap(query("#" + String(id), root, true)[0]);
 		if (p === "getElementsByClassName") return name => query("." + String(name).trim().split(/\s+/)[0], root, true).map(wrap);
 		if (p === "getElementsByTagName") return name => query(String(name), root, true).map(wrap);
-		if (p === "createElement") return tag => { const n = build({ id: nextId++, tagName: String(tag).toUpperCase() }); n.connected = false; return wrap(n); };
+		if (p === "createElement") return tag => { const safeTag = assertSafeElementName(tag); const n = build({ id: nextId++, tagName: safeTag.toUpperCase() }); n.connected = false; return wrap(n); };
 		if (p === "createTextNode") return text => wrap(makeText(String(text)));
 		if (p === "createComment") return text => { const n = makeText(String(text)); n.nodeType = 8; n.tagName = "#comment"; return wrap(n); };
 		if (p === "createDocumentFragment") { const n = build({ id: nextId++, nodeType: 11, tagName: "#fragment" }); setConnected(n, false); return wrap(n); }
