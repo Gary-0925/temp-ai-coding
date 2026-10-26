@@ -133,6 +133,7 @@ class PpermStyle {
 		Object.preventExtensions(this);
 		return new Proxy(this, {
 			get(target, property) {
+				if (typeof property === "string" && ["__proto__", "prototype", "constructor"].includes(property)) denied(property);
 				if (typeof property !== "string" || property in target) {
 					const value = Reflect.get(target, property, target);
 					return typeof value === "function" ? value.bind(target) : value;
@@ -142,6 +143,7 @@ class PpermStyle {
 				return target.#owner.styleData[key] ?? "";
 			},
 			set(target, property, value) {
+				if (typeof property === "string" && ["__proto__", "prototype", "constructor"].includes(property)) denied(property);
 				if (typeof property !== "string" || property in target) return Reflect.set(target, property, value, target);
 				target.#gate.check("dom");
 				const name = property.startsWith("--") ? property : property.replace(/[A-Z]/g, character => "-" + character.toLowerCase());
@@ -195,6 +197,7 @@ class PpermStyle {
 		return this.#owner.styleData[key] ?? "";
 	}
 	getPropertyPriority(name) { this.#gate.check("dom"); return ""; }
+	[Symbol.iterator]() { this.#gate.check("dom"); return Array.from({ length: this.length }, (_, index) => this.item(index))[Symbol.iterator](); }
 	removeProperty(name) {
 		this.#gate.check("dom");
 		const property = String(name);
