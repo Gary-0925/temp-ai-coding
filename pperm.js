@@ -109,6 +109,7 @@ function snapshotNode(node, ids, state) {
 		value: node.nodeType === 1 && "value" in node ? node.value : undefined,
 		checked: node.nodeType === 1 && "checked" in node ? node.checked : undefined,
 		disabled: node.nodeType === 1 && "disabled" in node ? node.disabled : undefined,
+		muted: node.nodeType === 1 && "muted" in node ? node.muted : undefined,
 		selected: node.nodeType === 1 && "selected" in node ? node.selected : undefined,
 		indeterminate: node.nodeType === 1 && "indeterminate" in node ? node.indeterminate : undefined,
 		tabIndex: node.nodeType === 1 && "tabIndex" in node ? node.tabIndex : undefined,
@@ -156,6 +157,7 @@ function createNativeNode(data, ids) {
 	if (data.value !== undefined && "value" in node) node.value = data.value;
 	if (data.checked !== undefined && "checked" in node) node.checked = data.checked;
 	if (data.disabled !== undefined && "disabled" in node) node.disabled = data.disabled;
+	if (data.muted !== undefined && "muted" in node) node.muted = data.muted;
 	if (data.selected !== undefined && "selected" in node) node.selected = data.selected;
 	if (data.indeterminate !== undefined && "indeterminate" in node) node.indeterminate = data.indeterminate;
 	if (data.tabIndex !== undefined && "tabIndex" in node) node.tabIndex = data.tabIndex;
@@ -457,7 +459,7 @@ export class PpermProcess extends EventTarget {
 					snapshot = { id: 1, nodeType: 1, tagName: "BODY", idName: "", className: "", text: "", attributes: {}, styleData: {}, children: [] };
 					this.#nodeIds = new Map();
 				}
-				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-42", import.meta.url));
+				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-43", import.meta.url));
 				this.#worker.addEventListener("message", event => {
 					if (settled || this.#terminated) return;
 					const message = event.data;
