@@ -43,6 +43,7 @@ function query(selector, scope = root, includeScope = false) {
 }
 
 function serialize(node) {
+	node = raw(node);
 	return { id: node.id, nodeType: node.nodeType, tagName: node.tagName, idName: node.idName,
 		className: node.className, text: node.text, attributes: { ...node.attributes },
 		styleData: { ...node.styleData }, children: node.children.map(serialize) };
