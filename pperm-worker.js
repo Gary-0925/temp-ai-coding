@@ -286,13 +286,39 @@ class PpermNode {
 
 	_getProperty(property) {
 		this._gate.check("dom");
+		return this._getIdentityProperty(property)
+			?? this._getTreeProperty(property)
+			?? this._getQueryMethod(property)
+			?? this._getMutationMethod(property)
+			?? this._getEventMethod(property)
+			?? this._getAttributeProperty(property)
+			?? this._getBlockedProperty(property)
+			?? this._getFallbackProperty(property);
+	}
+
+	_getIdentityProperty(property) {
+		this._gate.check("dom");
 		const d = this._data;
 		switch (property) {
 			case "id": return d.idName;
 			case "className": return d.className;
 			case "tagName": case "nodeName": return d.tagName;
 			case "nodeType": return d.nodeType;
+			case "nodeValue": case "data": return d.nodeType === 3 || d.nodeType === 8 ? d.text : null;
 			case "textContent": return d.nodeType === 3 || d.nodeType === 8 ? d.text : d.text + d.children.map(child => new PpermNode(child, this._gate).textContent).join("");
+			case "style": return this._style;
+			case "classList": return this._classList;
+			case "isConnected": return d.connected;
+			case "ownerDocument": return documentProxy;
+			case "attributes": return Object.entries(d.attributes).map(([name, value]) => ({ name, value }));
+			default: return undefined;
+		}
+	}
+
+	_getTreeProperty(property) {
+		this._gate.check("dom");
+		const d = this._data;
+		switch (property) {
 			case "parentNode": return d.parent ? new PpermNode(d.parent, this._gate) : null;
 			case "parentElement": return d.parent?.nodeType === 1 ? new PpermNode(d.parent, this._gate) : null;
 			case "children": return d.children.filter(child => child.nodeType === 1).map(child => new PpermNode(child, this._gate));
@@ -308,21 +334,30 @@ class PpermNode {
 				const sibling = siblings[index + (property.startsWith("next") ? 1 : -1)];
 				return sibling ? new PpermNode(sibling, this._gate) : null;
 			}
-			case "nodeValue": case "data": return d.nodeType === 3 || d.nodeType === 8 ? d.text : null;
-			case "style": return this._style;
-			case "classList": return this._classList;
-			case "isConnected": return d.connected;
-			case "ownerDocument": return documentProxy;
-			case "childrenCount": return d.children.length;
 			case "hasChildNodes": return () => { this._gate.check("dom"); return d.children.length > 0; };
+			case "contains": return other => this.contains(other);
+			default: return undefined;
+		}
+	}
+
+	_getQueryMethod(property) {
+		this._gate.check("dom");
+		switch (property) {
 			case "getAttribute": return name => this.getAttribute(name);
 			case "hasAttribute": return name => this.hasAttribute(name);
-			case "setAttribute": return (name, value) => this.setAttribute(name, value);
-			case "removeAttribute": return name => this.removeAttribute(name);
 			case "matches": return selector => this.matches(selector);
 			case "querySelector": return selector => this.querySelector(selector);
 			case "querySelectorAll": return selector => this.querySelectorAll(selector);
 			case "closest": return selector => this.closest(selector);
+			default: return undefined;
+		}
+	}
+
+	_getMutationMethod(property) {
+		this._gate.check("dom");
+		switch (property) {
+			case "setAttribute": return (name, value) => this.setAttribute(name, value);
+			case "removeAttribute": return name => this.removeAttribute(name);
 			case "appendChild": return child => this.appendChild(child);
 			case "append": return (...items) => this.append(...items);
 			case "prepend": return (...items) => this.prepend(...items);
@@ -333,74 +368,130 @@ class PpermNode {
 			case "removeChild": return child => this.removeChild(child);
 			case "replaceChildren": return (...items) => this.replaceChildren(...items);
 			case "remove": return () => this.remove();
+			case "cloneNode": return deep => this.cloneNode(deep);
+			default: return undefined;
+		}
+	}
+
+	_getEventMethod(property) {
+		this._gate.check("dom");
+		switch (property) {
 			case "addEventListener": return (type, callback, options) => this.addEventListener(type, callback, options);
 			case "removeEventListener": return (type, callback, options) => this.removeEventListener(type, callback, options);
-			case "contains": return other => this.contains(other);
+			case "dispatchEvent": return event => this.dispatchEvent(event);
 			case "click": return () => this.click();
 			case "focus": return () => this.focus();
 			case "blur": return () => this.blur();
-			case "cloneNode": return deep => this.cloneNode(deep);
 			case "getBoundingClientRect": return () => this.getBoundingClientRect();
-			case "dispatchEvent": return event => this.dispatchEvent(event);
-			case "attributes": return Object.entries(d.attributes).map(([name, value]) => ({ name, value }));
-			case "innerHTML": case "outerHTML": case "srcdoc": case "outerText":
-				denied(property);
-			case "insertAdjacentHTML": case "setHTMLUnsafe": case "setHTML":
-				return (...args) => { this._gate.check("dom"); denied(property); };
-			default:
-				if (/^on[a-z]+$/i.test(String(property))) return this._eventProperties.get(String(property)) ?? null;
-				if (Object.hasOwn(d, String(property)) &&
-					!["id", "idName", "className", "text", "attributes", "styleData", "parent", "children", "connected"].includes(String(property))) {
-					return d[String(property)];
-				}
-				if (Object.hasOwn(d.attributes, String(property).toLowerCase())) return d.attributes[String(property).toLowerCase()];
-				return undefined;
+			default: return undefined;
 		}
+	}
+
+	_getAttributeProperty(property) {
+		this._gate.check("dom");
+		const name = String(property).toLowerCase();
+		return Object.hasOwn(this._data.attributes, name) ? this._data.attributes[name] : undefined;
+	}
+
+	_getBlockedProperty(property) {
+		this._gate.check("dom");
+		if (["innerHTML", "outerHTML", "srcdoc", "outerText"].includes(String(property))) denied(property);
+		if (["insertAdjacentHTML", "setHTMLUnsafe", "setHTML"].includes(String(property))) {
+			return (...args) => { this._gate.check("dom"); denied(property); };
+		}
+		return undefined;
+	}
+
+	_getFallbackProperty(property) {
+		this._gate.check("dom");
+		const name = String(property);
+		if (/^on[a-z]+$/i.test(name)) return this._eventProperties.get(name) ?? null;
+		const d = this._data;
+		if (Object.hasOwn(d, name) &&
+			!["id", "idName", "className", "text", "attributes", "styleData", "parent", "children", "connected"].includes(name)) {
+			return d[name];
+		}
+		return undefined;
 	}
 
 	_setProperty(property, value) {
 		this._gate.check("dom");
+		if (this._setEventProperty(property, value)) return true;
+		if (this._setIdentityProperty(property, value)) return true;
+		if (this._setTextProperty(property, value)) return true;
+		if (this._setNodeValueProperty(property, value)) return true;
+		if (this._setUrlProperty(property, value)) return true;
+		return this._setPrimitiveProperty(property, value);
+	}
+
+	_setEventProperty(property, value) {
+		this._gate.check("dom");
+		if (typeof property !== "string" || !/^on[a-z]+$/i.test(property)) return false;
+		const old = this._eventProperties.get(property);
+		if (old) this.removeEventListener(property.slice(2), old);
+		if (value == null) {
+			this._eventProperties.delete(property);
+			return true;
+		}
+		if (typeof value !== "function") throw new TypeError(property + " must be a function or null");
+		this._eventProperties.set(property, value);
+		this.addEventListener(property.slice(2).toLowerCase(), value);
+		return true;
+	}
+
+	_setIdentityProperty(property, value) {
+		this._gate.check("dom");
+		if (property !== "id" && property !== "className") return false;
+		const name = property === "id" ? "id" : "class";
+		const text = String(value);
+		if (name === "id") this._data.idName = text;
+		else this._data.className = text;
+		this._data.attributes[name] = text;
+		emitMutation(this._data, "attribute", { name, value: text });
+		return true;
+	}
+
+	_setTextProperty(property, value) {
+		this._gate.check("dom");
+		if (property !== "textContent" && property !== "innerText") return false;
 		const d = this._data;
-		if (typeof property === "string" && /^on[a-z]+$/i.test(property)) {
-			const old = this._eventProperties.get(property);
-			if (old) this.removeEventListener(property.slice(2), old);
-			if (value == null) { this._eventProperties.delete(property); return true; }
-			if (typeof value !== "function") throw new TypeError(property + " must be a function or null");
-			this._eventProperties.set(property, value);
-			this.addEventListener(property.slice(2).toLowerCase(), value);
-			return true;
+		for (const child of d.children) {
+			child.parent = null;
+			setConnected(child, false);
 		}
-		if (blockedProperties.has(String(property)) || String(property).startsWith("_") || ["constructor", "prototype", "__proto__"].includes(String(property))) denied(String(property));
-		if (["id", "className"].includes(property)) {
-			const name = property === "id" ? "id" : "class";
-			const text = String(value);
-			if (name === "id") d.idName = text; else d.className = text;
-			d.attributes[name] = text;
-			emitMutation(d, "attribute", { name, value: text });
-			return true;
-		}
-		if (property === "textContent" || property === "innerText") {
-			for (const child of d.children) { child.parent = null; setConnected(child, false); }
-			d.children = [];
+		d.children = [];
+		d.text = String(value);
+		emitMutation(d, "text", { value: d.text });
+		return true;
+	}
+
+	_setNodeValueProperty(property, value) {
+		this._gate.check("dom");
+		if (property !== "nodeValue" && property !== "data") return false;
+		const d = this._data;
+		if (d.nodeType === 3 || d.nodeType === 8) {
 			d.text = String(value);
 			emitMutation(d, "text", { value: d.text });
-			return true;
 		}
-		if (property === "nodeValue" || property === "data") {
-			if (d.nodeType === 3 || d.nodeType === 8) {
-				d.text = String(value);
-				emitMutation(d, "text", { value: d.text });
-			}
-			return true;
-		}
-		if (["href", "src", "poster", "cite", "background", "data", "manifest", "action", "formAction"].includes(String(property))) {
-			safeAttribute(String(property).toLowerCase(), value);
-		}
+		return true;
+	}
+
+	_setUrlProperty(property, value) {
+		this._gate.check("dom");
+		if (!["href", "src", "poster", "cite", "background", "data", "manifest", "action", "formAction"].includes(String(property))) return false;
+		safeAttribute(String(property).toLowerCase(), value);
+		return this._setPrimitiveProperty(property, value);
+	}
+
+	_setPrimitiveProperty(property, value) {
+		this._gate.check("dom");
+		const name = String(property);
+		if (blockedProperties.has(name) || name.startsWith("_") || ["constructor", "prototype", "__proto__"].includes(name)) denied(name);
 		if (typeof value === "function" || (value !== null && typeof value === "object")) {
 			throw new TypeError("This DOM property requires a serializable primitive value");
 		}
-		d[property] = value;
-		emitMutation(d, "property", { property: String(property), value });
+		this._data[property] = value;
+		emitMutation(this._data, "property", { property: name, value });
 		return true;
 	}
 
