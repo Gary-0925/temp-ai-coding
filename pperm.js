@@ -18,6 +18,55 @@ function normalizePermissions(permissions = {}) {
 	};
 }
 
+const blockedElementNames = new Set([
+	"script", "iframe", "frame", "frameset", "object", "embed", "applet",
+	"base", "meta", "link", "style", "svg", "math", "portal", "fencedframe",
+	"webview"
+]);
+const safePropertyNames = new Set([
+	"value", "checked", "disabled", "title", "hidden", "name", "type",
+	"href", "src", "alt", "tabIndex", "role", "draggable", "contentEditable"
+]);
+const urlAttributeNames = new Set([
+	"href", "src", "action", "formaction", "poster", "cite", "xlink:href",
+	"background", "data", "manifest"
+]);
+
+function assertSafeElementName(value) {
+	const name = String(value).toLowerCase();
+	if (!/^[a-z][a-z0-9-]*$/.test(name) || name.includes("-") || blockedElementNames.has(name)) {
+		throw new DOMException("Element type is not permitted by the DOM bridge", "NotAllowedError");
+	}
+	return name;
+}
+
+function assertSafeAttribute(name, value) {
+	name = String(name).toLowerCase();
+	if (!/^[a-z_:][a-z0-9_.:-]*$/.test(name) || name.startsWith("on") ||
+		["srcdoc", "nonce", "integrity", "is", "formaction", "action"].includes(name)) {
+		throw new DOMException("Attribute is not permitted by the DOM bridge: " + name, "NotAllowedError");
+	}
+	if (urlAttributeNames.has(name)) {
+		const url = String(value).trim().replace(/[\\u0000-\\u0020]+/g, "");
+		if (/^(javascript|vbscript):/i.test(url) ||
+			/^data:(text\\/html|application\\/xhtml\\+xml)/i.test(url)) {
+			throw new DOMException("Executable URLs are not permitted by the DOM bridge", "NotAllowedError");
+		}
+	}
+	return name;
+}
+
+function assertSafeProperty(name, value) {
+	name = String(name);
+	if (!safePropertyNames.has(name)) {
+		throw new DOMException("DOM property is not permitted by the bridge: " + name, "NotAllowedError");
+	}
+	if (name === "href" || name === "src") {
+		assertSafeAttribute(name, value);
+	}
+	return name;
+}
+
 function snapshotNode(node, ids, state) {
 	const id = state.nextId++;
 	ids.set(id, node);
@@ -51,9 +100,12 @@ function createNativeNode(data, ids) {
 	else if (data.nodeType === 8) node = document.createComment(data.text ?? "");
 	else if (data.nodeType === 11) node = document.createDocumentFragment();
 	else {
-		node = document.createElement(String(data.tagName ?? "div").toLowerCase());
+		const tagName = assertSafeElementName(data.tagName ?? "div");
+		node = document.createElement(tagName);
 		for (const [name, value] of Object.entries(data.attributes ?? {})) {
-			try { node.setAttribute(name, String(value)); } catch {}
+			try { node.setAttribute(assertSafeAttribute(name, value), String(value)); } catch (error) {
+				if (error?.name === "NotAllowedError") throw error;
+			}
 		}
 		for (const [name, value] of Object.entries(data.styleData ?? {})) {
 			try { node.style[name] = String(value); } catch {}
@@ -79,9 +131,15 @@ function applyDomMessage(message, ids, root) {
 			else target.style.setProperty(message.property, message.value, message.priority ?? "");
 		} else target.style[message.property] = message.value;
 	}
-	else if (message.op === "attribute") target.setAttribute(message.name, String(message.value));
-	else if (message.op === "removeAttribute") target.removeAttribute(message.name);
-	else if (message.op === "property") target[message.property] = message.value;
+	else if (message.op === "attribute") target.setAttribute(assertSafeAttribute(message.name, message.value), String(message.value));
+	else if (message.op === "removeAttribute") {
+		const name = String(message.name).toLowerCase();
+		if (name.startsWith("on") || ["srcdoc", "nonce", "integrity", "is"].includes(name)) {
+			throw new DOMException("Attribute is not permitted by the DOM bridge: " + name, "NotAllowedError");
+		}
+		target.removeAttribute(name);
+	}
+	else if (message.op === "property") target[assertSafeProperty(message.property, message.value)] = message.value;
 	else if (message.op === "append") target.appendChild(createNativeNode(message.child, ids));
 	else if (message.op === "insert") {
 		const before = ids.get(message.beforeId) ?? null;
@@ -91,7 +149,13 @@ function applyDomMessage(message, ids, root) {
 		const child = ids.get(message.childId);
 		if (child?.parentNode === target && child !== root) target.removeChild(child);
 	}
-	else if (message.op === "click" || message.op === "focus" || message.op === "blur") target[message.op]();
+	else if (message.op === "click" || message.op === "focus" || message.op === "blur") {
+		if (message.op === "click" && target instanceof Element && ["A", "AREA", "FORM", "INPUT"].includes(target.tagName) &&
+			(target.tagName === "FORM" || target.type === "submit" || target.type === "image" || target.href)) {
+			throw new DOMException("Programmatic activation of navigation/submission controls is not permitted", "NotAllowedError");
+		}
+		target[message.op]();
+	}
 }
 
 export class PpermProcess extends EventTarget {
