@@ -176,11 +176,16 @@ class PpermStyle {
 		return name == null ? "" : (name.startsWith("--") ? name : name.replace(/[A-Z]/g, c => "-" + c.toLowerCase())); }
 	setProperty(name, value, priority = "") {
 		this.#gate.check("dom");
-		const property = safeStyle(name, value);
 		const cssValue = String(value);
+		const property = safeStyle(name, cssValue);
+		const cssPriority = String(priority);
+		if (cssPriority.trim() && cssPriority.trim().toLowerCase() !== "important") {
+			throw new TypeError("CSS priority must be empty or \"important\"");
+		}
 		const key = property.startsWith("--") ? property : property.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-		this.#owner.styleData[key] = cssValue;
-		emitMutation(this.#owner, "style", { property, value: cssValue, priority: String(priority) });
+		if (cssValue === "") delete this.#owner.styleData[key];
+		else this.#owner.styleData[key] = cssValue;
+		emitMutation(this.#owner, "styleSetProperty", { property, value: cssValue, priority: cssPriority });
 	}
 	getPropertyValue(name) {
 		this.#gate.check("dom");
@@ -192,11 +197,11 @@ class PpermStyle {
 	[Symbol.iterator]() { this.#gate.check("dom"); return Array.from({ length: this.length }, (_, index) => this.item(index))[Symbol.iterator](); }
 	removeProperty(name) {
 		this.#gate.check("dom");
-		const property = String(name);
+		const property = safeStyle(name, "");
 		const key = property.startsWith("--") ? property : property.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 		const oldValue = this.#owner.styleData[key] ?? "";
 		delete this.#owner.styleData[key];
-		emitMutation(this.#owner, "style", { property: String(name), value: "" });
+		emitMutation(this.#owner, "styleRemoveProperty", { property });
 		return oldValue;
 	}
 }
