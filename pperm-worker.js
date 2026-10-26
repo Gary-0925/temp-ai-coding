@@ -1334,11 +1334,11 @@ class PpermDocument {
 
 	getElementsByClassName(name) {
 		this._gate.check("dom");
-		const classes = String(name).trim().split(/\\s+/).filter(Boolean);
+		const classes = String(name).trim().split(/\s+/).filter(Boolean);
 		if (!classes.length) return [];
 		const out = [];
 		const walk = data => {
-			if (data.nodeType === 1 && classes.every(value => data.className.split(/\\s+/).includes(value))) out.push(new PpermNode(data, this._gate));
+			if (data.nodeType === 1 && classes.every(value => data.className.split(/\s+/).includes(value))) out.push(new PpermNode(data, this._gate));
 			data.children.forEach(walk);
 		};
 		walk(root);
