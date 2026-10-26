@@ -219,10 +219,10 @@ await new Promise(resolve => {
 						<label><input id="indexedDB" type="checkbox"> IndexedDB</label>
 						<label><input id="cache" type="checkbox"> Cache API</label>
 						<strong>DOM 桥接</strong>
-						<label><input id="domEnabled" type="checkbox"> 允许操作指定元素</label>
+						<label><input id="domEnabled" type="checkbox" checked> 允许操作指定元素</label>
 						<label for="domRoot">可操作的根元素选择器</label>
 						<input id="domRoot" value="#dom-target" aria-label="DOM 根元素选择器">
-						<p class="hint">用户脚本在独立 Worker 中执行，主线程不会被脚本的死循环直接占住；超时后可终止该 Worker。DOM API 不需要 await，但操作通过消息队列应用到主线程，因此读取的是 Worker 内的本地 DOM 镜像；目前选择器仅支持 tag、#id、.class，innerHTML 和复杂选择器不支持。每次点击“启动实例”都会创建独立 Worker，点击“停止全部”终止全部实例。</p>
+						<p class="hint">用户脚本在独立 Worker 中执行，主线程不会被脚本的死循环直接占住；超时后可终止该 Worker。默认已启用 DOM 权限并将 #dom-target 作为操作范围。DOM API 不需要 await，但操作通过消息队列应用到主线程，因此读取的是 Worker 内的本地 DOM 镜像；目前选择器仅支持 tag、#id、.class，innerHTML 和复杂选择器不支持。每次点击“启动实例”都会创建独立 Worker，点击“停止全部”终止全部实例。</p>
 					</div>
 				</section>
 
@@ -244,7 +244,7 @@ await new Promise(resolve => {
 		</main>
 
 		<script type="module">
-			import pperm from "./pperm.js?v=20261026-2";
+			import pperm from "./pperm.js?v=20261026-3";
 
 			const editor = document.querySelector("#editor");
 			const output = document.querySelector("#output");
