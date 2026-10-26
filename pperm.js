@@ -80,6 +80,7 @@ function assertSafeStyle(property, value) {
 }
 
 function snapshotNode(node, ids, state) {
+	if (node.nodeType === 1 && blockedElementNames.has(node.localName.toLowerCase())) return null;
 	const id = state.nextId++;
 	ids.set(id, node);
 	const attributes = {};
@@ -105,7 +106,7 @@ function snapshotNode(node, ids, state) {
 		text: node.nodeType === 3 || node.nodeType === 8 ? node.nodeValue ?? "" : "",
 		attributes,
 		styleData,
-		children: Array.from(node.childNodes, child => snapshotNode(child, ids, state))
+		children: Array.from(node.childNodes, child => snapshotNode(child, ids, state)).filter(Boolean)
 	};
 }
 
@@ -301,6 +302,7 @@ export class PpermProcess extends EventTarget {
 		if (this.permissions.dom.enabled) {
 			this.#root = document.querySelector(this.permissions.dom.root);
 			if (!this.#root) throw new Error("DOM root not found: " + this.permissions.dom.root);
+			if (blockedElementNames.has(this.#root.localName.toLowerCase())) throw new DOMException("The configured DOM root is not permitted", "NotAllowedError");
 		}
 	}
 
@@ -344,7 +346,7 @@ export class PpermProcess extends EventTarget {
 					snapshot = { id: 1, nodeType: 1, tagName: "BODY", idName: "", className: "", text: "", attributes: {}, styleData: {}, children: [] };
 					this.#nodeIds = new Map();
 				}
-				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-22", import.meta.url));
+				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-23", import.meta.url));
 				this.#worker.addEventListener("message", event => {
 					if (settled || this.#terminated) return;
 					const message = event.data;
