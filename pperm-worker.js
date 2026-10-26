@@ -5,7 +5,7 @@ let documentProxy = null;
 let documentTitle = "";
 const nodes = new Map();
 const listeners = new Map();
-const nodeDataByProxy = new WeakMap();
+const nodeDataByInstance = new WeakMap();
 
 function emit(type, data = {}) {
 	if (!stopped) postMessage({ type, ...data });
@@ -79,7 +79,7 @@ function selectorMatches(node, selector) {
 }
 
 function raw(node) {
-	return nodeDataByProxy.get(node) ?? node;
+	return nodeDataByInstance.get(node) ?? node;
 }
 
 function setConnected(data, connected) {
@@ -857,7 +857,7 @@ class PpermNode {
 		this.#style = new PpermStyle(data, gate);
 		this.#classList = new PpermTokenList(data, gate);
 		this.#eventProperties = new Map();
-		nodeDataByProxy.set(this, this.#data);
+		nodeDataByInstance.set(this, this.#data);
 		Object.preventExtensions(this);
 	}
 
