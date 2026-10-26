@@ -339,6 +339,72 @@ class PpermNode {
 	set name(value) { this._gate.check("dom"); const text=String(value);this._data.attributes.name=text;emitMutation(this._data,"attribute",{name:"name",value:text}); }
 	get type() { this._gate.check("dom"); return this._data.attributes.type??""; }
 	set type(value) { this._gate.check("dom"); const text=String(value);this._data.attributes.type=text;emitMutation(this._data,"attribute",{name:"type",value:text}); }
+
+	get onclick() { this._gate.check("dom"); return this._eventProperties.get("onclick") ?? null; }
+	set onclick(value) {
+		this._gate.check("dom");
+		const old = this._eventProperties.get("onclick");
+		if (old) this.removeEventListener("click", old);
+		if (value == null) { this._eventProperties.delete("onclick"); return; }
+		if (typeof value !== "function") throw new TypeError("onclick must be a function or null");
+		this._eventProperties.set("onclick", value);
+		this.addEventListener("click", value);
+	}
+
+	get onchange() { this._gate.check("dom"); return this._eventProperties.get("onchange") ?? null; }
+	set onchange(value) {
+		this._gate.check("dom");
+		const old = this._eventProperties.get("onchange");
+		if (old) this.removeEventListener("change", old);
+		if (value == null) { this._eventProperties.delete("onchange"); return; }
+		if (typeof value !== "function") throw new TypeError("onchange must be a function or null");
+		this._eventProperties.set("onchange", value);
+		this.addEventListener("change", value);
+	}
+
+	get oninput() { this._gate.check("dom"); return this._eventProperties.get("oninput") ?? null; }
+	set oninput(value) {
+		this._gate.check("dom");
+		const old = this._eventProperties.get("oninput");
+		if (old) this.removeEventListener("input", old);
+		if (value == null) { this._eventProperties.delete("oninput"); return; }
+		if (typeof value !== "function") throw new TypeError("oninput must be a function or null");
+		this._eventProperties.set("oninput", value);
+		this.addEventListener("input", value);
+	}
+
+	get onsubmit() { this._gate.check("dom"); return this._eventProperties.get("onsubmit") ?? null; }
+	set onsubmit(value) {
+		this._gate.check("dom");
+		const old = this._eventProperties.get("onsubmit");
+		if (old) this.removeEventListener("submit", old);
+		if (value == null) { this._eventProperties.delete("onsubmit"); return; }
+		if (typeof value !== "function") throw new TypeError("onsubmit must be a function or null");
+		this._eventProperties.set("onsubmit", value);
+		this.addEventListener("submit", value);
+	}
+
+	get onfocus() { this._gate.check("dom"); return this._eventProperties.get("onfocus") ?? null; }
+	set onfocus(value) {
+		this._gate.check("dom");
+		const old = this._eventProperties.get("onfocus");
+		if (old) this.removeEventListener("focus", old);
+		if (value == null) { this._eventProperties.delete("onfocus"); return; }
+		if (typeof value !== "function") throw new TypeError("onfocus must be a function or null");
+		this._eventProperties.set("onfocus", value);
+		this.addEventListener("focus", value);
+	}
+
+	get onblur() { this._gate.check("dom"); return this._eventProperties.get("onblur") ?? null; }
+	set onblur(value) {
+		this._gate.check("dom");
+		const old = this._eventProperties.get("onblur");
+		if (old) this.removeEventListener("blur", old);
+		if (value == null) { this._eventProperties.delete("onblur"); return; }
+		if (typeof value !== "function") throw new TypeError("onblur must be a function or null");
+		this._eventProperties.set("onblur", value);
+		this.addEventListener("blur", value);
+	}
 	get innerHTML() { this._gate.check("dom"); denied("innerHTML"); }
 	set innerHTML(value) { this._gate.check("dom"); denied("innerHTML"); }
 	get outerHTML() { this._gate.check("dom"); denied("outerHTML"); }
