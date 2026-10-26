@@ -403,7 +403,7 @@ class PpermNode {
 					target.#gate.check("dom");
 					const { attribute, kind } = ordinaryAttributeProperties.get(property);
 					let next = value;
-					if (kind === "boolean") next = Boolean(value);
+					if (kind === "boolean") { next = Boolean(value); safeAttribute(attribute, ""); }
 					else { next = String(value); safeAttribute(attribute, next); }
 					if (kind === "boolean") {
 						if (next) target.#data.attributes[attribute] = "";
