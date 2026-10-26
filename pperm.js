@@ -67,7 +67,7 @@ function assertSafeProperty(name, value) {
 
 function assertSafeStyle(property, value) {
 	const css = String(value);
-	if (/url\s*\(|expression\s*\(|@import|-moz-binding|behavior\s*:/i.test(css)) {
+	if (/url\s*\(|expression\s*\(|@import|-moz-binding|behavior\s*:|\\|\/\*/i.test(css)) {
 		throw new DOMException("CSS resource loading and executable CSS are not permitted by the DOM bridge", "NotAllowedError");
 	}
 	return String(property);
