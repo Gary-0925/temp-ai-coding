@@ -277,7 +277,7 @@ class DomBridge {
 		const value = Number(message.value);
 		if (!Number.isFinite(value)) throw new TypeError(property + " must be a finite number");
 		if (property in target) target[property] = value;
-		else target.setAttribute(property.replace(/[A-Z]/g, character => "-" + character.toLowerCase()), String(value));
+		else target.setAttribute(property.toLowerCase(), String(value));
 	}
 
 	setStyle(target, message) {
