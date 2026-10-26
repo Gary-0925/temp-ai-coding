@@ -64,9 +64,9 @@ function wrap(node) {
 		get(_, key) {
 			if (key === "setProperty") return (name, value, priority = "") => {
 				const property = String(name);
-				const cssValue = String(value) + (priority ? " !" + String(priority) : "");
+				const cssValue = String(value);
 				node.styleData[property.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] = cssValue;
-				mutate("style", node, { property, value: cssValue });
+				mutate("style", node, { property, value: cssValue, priority: String(priority) });
 			};
 			if (key === "getPropertyValue") return name => node.styleData[String(name).replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] ?? "";
 			if (key === "removeProperty") return name => {
