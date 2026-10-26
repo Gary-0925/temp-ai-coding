@@ -927,6 +927,26 @@ class PpermNode {
 	get namespaceURI() { this.#gate.check("dom"); return this.#data.nodeType === 1 ? "http://www.w3.org/1999/xhtml" : null; }
 	get prefix() { this.#gate.check("dom"); return null; }
 	get baseURI() { this.#gate.check("dom"); return documentProxy?.baseURI ?? ""; }
+	get isContentEditable() {
+		this.#gate.check("dom");
+		const value = String(this.#data.attributes.contenteditable ?? "").toLowerCase();
+		return value === "" || value === "true" || value === "plaintext-only";
+	}
+	get offsetParent() { this.#gate.check("dom"); return null; }
+	get offsetWidth() { this.#gate.check("dom"); throw new DOMException("Layout measurements are asynchronous across the Worker bridge and are not supported yet", "NotSupportedError"); }
+	get offsetHeight() { this.#gate.check("dom"); throw new DOMException("Layout measurements are asynchronous across the Worker bridge and are not supported yet", "NotSupportedError"); }
+	get offsetTop() { this.#gate.check("dom"); throw new DOMException("Layout measurements are asynchronous across the Worker bridge and are not supported yet", "NotSupportedError"); }
+	get offsetLeft() { this.#gate.check("dom"); throw new DOMException("Layout measurements are asynchronous across the Worker bridge and are not supported yet", "NotSupportedError"); }
+	get clientWidth() { this.#gate.check("dom"); throw new DOMException("Layout measurements are asynchronous across the Worker bridge and are not supported yet", "NotSupportedError"); }
+	get clientHeight() { this.#gate.check("dom"); throw new DOMException("Layout measurements are asynchronous across the Worker bridge and are not supported yet", "NotSupportedError"); }
+	get clientTop() { this.#gate.check("dom"); throw new DOMException("Layout measurements are asynchronous across the Worker bridge and are not supported yet", "NotSupportedError"); }
+	get clientLeft() { this.#gate.check("dom"); throw new DOMException("Layout measurements are asynchronous across the Worker bridge and are not supported yet", "NotSupportedError"); }
+	get scrollWidth() { this.#gate.check("dom"); throw new DOMException("Layout measurements are asynchronous across the Worker bridge and are not supported yet", "NotSupportedError"); }
+	get scrollHeight() { this.#gate.check("dom"); throw new DOMException("Layout measurements are asynchronous across the Worker bridge and are not supported yet", "NotSupportedError"); }
+	get scrollTop() { this.#gate.check("dom"); throw new DOMException("Scrolling is not exposed by the DOM bridge", "NotSupportedError"); }
+	set scrollTop(value) { this.#gate.check("dom"); throw new DOMException("Scrolling is not exposed by the DOM bridge", "NotSupportedError"); }
+	get scrollLeft() { this.#gate.check("dom"); throw new DOMException("Scrolling is not exposed by the DOM bridge", "NotSupportedError"); }
+	set scrollLeft(value) { this.#gate.check("dom"); throw new DOMException("Scrolling is not exposed by the DOM bridge", "NotSupportedError"); }
 	get childElementCount() { this.#gate.check("dom"); return this.#data.children.filter(child => child.nodeType === 1).length; }
 	get dataset() {
 		this.#gate.check("dom");
