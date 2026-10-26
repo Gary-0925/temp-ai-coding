@@ -95,7 +95,11 @@ function serialize(data) {
 	return {
 		id: data.id, nodeType: data.nodeType, tagName: data.tagName, idName: data.idName,
 		className: data.className, text: data.text, attributes: { ...data.attributes },
-		styleData: { ...data.styleData }, children: data.children.map(serialize)
+		styleData: { ...data.styleData }, value: data.value, checked: data.checked, disabled: data.disabled,
+		selected: data.selected, indeterminate: data.indeterminate, tabIndex: data.tabIndex, width: data.width,
+		height: data.height, rows: data.rows, cols: data.cols, maxLength: data.maxLength, minLength: data.minLength,
+		rowSpan: data.rowSpan, colSpan: data.colSpan, size: data.size, start: data.start, span: data.span,
+		children: data.children.map(serialize)
 	};
 }
 
@@ -105,6 +109,10 @@ function makeData(input = {}, parent = null) {
 		tagName: input.tagName ?? "#text", idName: input.idName ?? "",
 		className: input.className ?? "", text: input.text ?? "",
 		attributes: { ...(input.attributes ?? {}) }, styleData: { ...(input.styleData ?? {}) },
+		value: input.value, checked: input.checked, disabled: input.disabled, selected: input.selected,
+		indeterminate: input.indeterminate, tabIndex: input.tabIndex, width: input.width, height: input.height,
+		rows: input.rows, cols: input.cols, maxLength: input.maxLength, minLength: input.minLength,
+		rowSpan: input.rowSpan, colSpan: input.colSpan, size: input.size, start: input.start, span: input.span,
 		parent, children: [], connected: input.connected ?? true
 	};
 	nodes.set(data.id, data);
@@ -1065,9 +1073,9 @@ class PpermNode {
 	set title(value) { this.#gate.check("dom"); const text=String(value);this.#data.attributes.title=text;emitMutation(this.#data,"attribute",{name:"title",value:text}); }
 	get value() { this.#gate.check("dom"); return this.#data.value??this.#data.attributes.value??""; }
 	set value(value) { this.#gate.check("dom"); if(value!==null&&(typeof value==="object"||typeof value==="function"))throw new TypeError("DOM property value must be primitive");this.#data.value=value;emitMutation(this.#data,"property",{property:"value",value}); }
-	get checked() { this.#gate.check("dom"); return this.#data.checked??false; }
+	get checked() { this.#gate.check("dom"); return this.#data.checked ?? Object.hasOwn(this.#data.attributes, "checked"); }
 	set checked(value) { this.#gate.check("dom"); this.#data.checked=Boolean(value);emitMutation(this.#data,"property",{property:"checked",value:this.#data.checked}); }
-	get disabled() { this.#gate.check("dom"); return this.#data.disabled??false; }
+	get disabled() { this.#gate.check("dom"); return this.#data.disabled ?? Object.hasOwn(this.#data.attributes, "disabled"); }
 	set disabled(value) { this.#gate.check("dom"); this.#data.disabled=Boolean(value);emitMutation(this.#data,"property",{property:"disabled",value:this.#data.disabled}); }
 	get name() { this.#gate.check("dom"); return this.#data.attributes.name??""; }
 	set name(value) { this.#gate.check("dom"); const text=String(value);this.#data.attributes.name=text;emitMutation(this.#data,"attribute",{name:"name",value:text}); }
