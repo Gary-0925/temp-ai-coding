@@ -272,7 +272,9 @@ class PpermTokenList {
 
 	add(...values) {
 		this.#gate.check("dom");
-		this._commit([...this._values(), ...values.map(String)]);
+		const tokens = values.map(String);
+		this._validateTokens(tokens);
+		this._commit([...this._values(), ...tokens], "add", tokens);
 	}
 
 	remove(...values) {
