@@ -96,6 +96,7 @@ export class PpermProcess extends EventTarget {
 	#resolveTermination;
 	#terminationPromise;
 	#running = false;
+	#finish = null;
 	#maxExecutionTimeMs;
 	#root = null;
 	#nodeIds = new Map();
@@ -202,8 +203,8 @@ export class PpermProcess extends EventTarget {
 				});
 				this.#timer = setTimeout(() => {
 					const error = new DOMException("Execution stopped: time limit exceeded", "TimeoutError");
-					this.terminate();
 					finish(error);
+					this.terminate();
 				}, this.#maxExecutionTimeMs);
 			} catch (error) {
 				finish(error);
