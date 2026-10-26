@@ -314,7 +314,7 @@ export class PpermProcess extends EventTarget {
 				this.#worker = null;
 				this.#running = false;
 				for (const entry of this.#domListeners) {
-					entry.target.removeEventListener(entry.type, entry.handler);
+					entry.target.removeEventListener(entry.type, entry.handler, { capture: !!entry.capture });
 				}
 				this.#domListeners = [];
 				this.#pendingListeners = [];
@@ -351,7 +351,7 @@ export class PpermProcess extends EventTarget {
 						} else if (message.type === "listen") this.#attachListener(message);
 						else if (message.type === "unlisten") {
 							for (const entry of this.#domListeners) {
-								if (entry.listenerId === message.listenerId) entry.target.removeEventListener(entry.type, entry.handler);
+								if (entry.listenerId === message.listenerId) entry.target.removeEventListener(entry.type, entry.handler, { capture: !!entry.capture });
 							}
 							this.#domListeners = this.#domListeners.filter(entry => entry.listenerId !== message.listenerId);
 						} else if (message.type === "documentTitle") {
@@ -471,7 +471,7 @@ export class PpermProcess extends EventTarget {
 		this.#worker?.terminate();
 		this.#worker = null;
 		for (const entry of this.#domListeners) {
-			entry.target.removeEventListener(entry.type, entry.handler);
+			entry.target.removeEventListener(entry.type, entry.handler, { capture: !!entry.capture });
 		}
 		this.#domListeners = [];
 		this.#pendingListeners = [];
