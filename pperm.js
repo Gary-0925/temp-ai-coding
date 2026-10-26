@@ -106,6 +106,23 @@ function snapshotNode(node, ids, state) {
 		text: node.nodeType === 3 || node.nodeType === 8 ? node.nodeValue ?? "" : "",
 		attributes,
 		styleData,
+		value: node.nodeType === 1 && "value" in node ? node.value : undefined,
+		checked: node.nodeType === 1 && "checked" in node ? node.checked : undefined,
+		disabled: node.nodeType === 1 && "disabled" in node ? node.disabled : undefined,
+		selected: node.nodeType === 1 && "selected" in node ? node.selected : undefined,
+		indeterminate: node.nodeType === 1 && "indeterminate" in node ? node.indeterminate : undefined,
+		tabIndex: node.nodeType === 1 && "tabIndex" in node ? node.tabIndex : undefined,
+		width: node.nodeType === 1 && "width" in node ? node.width : undefined,
+		height: node.nodeType === 1 && "height" in node ? node.height : undefined,
+		rows: node.nodeType === 1 && "rows" in node ? node.rows : undefined,
+		cols: node.nodeType === 1 && "cols" in node ? node.cols : undefined,
+		maxLength: node.nodeType === 1 && "maxLength" in node ? node.maxLength : undefined,
+		minLength: node.nodeType === 1 && "minLength" in node ? node.minLength : undefined,
+		rowSpan: node.nodeType === 1 && "rowSpan" in node ? node.rowSpan : undefined,
+		colSpan: node.nodeType === 1 && "colSpan" in node ? node.colSpan : undefined,
+		size: node.nodeType === 1 && "size" in node ? node.size : undefined,
+		start: node.nodeType === 1 && "start" in node ? node.start : undefined,
+		span: node.nodeType === 1 && "span" in node ? node.span : undefined,
 		children: Array.from(node.childNodes, child => snapshotNode(child, ids, state)).filter(Boolean)
 	};
 }
@@ -136,6 +153,23 @@ function createNativeNode(data, ids) {
 	}
 	ids.set(data.id, node);
 	for (const child of data.children ?? []) node.appendChild(createNativeNode(child, ids));
+	if (data.value !== undefined && "value" in node) node.value = data.value;
+	if (data.checked !== undefined && "checked" in node) node.checked = data.checked;
+	if (data.disabled !== undefined && "disabled" in node) node.disabled = data.disabled;
+	if (data.selected !== undefined && "selected" in node) node.selected = data.selected;
+	if (data.indeterminate !== undefined && "indeterminate" in node) node.indeterminate = data.indeterminate;
+	if (data.tabIndex !== undefined && "tabIndex" in node) node.tabIndex = data.tabIndex;
+	if (data.width !== undefined && "width" in node) node.width = data.width;
+	if (data.height !== undefined && "height" in node) node.height = data.height;
+	if (data.rows !== undefined && "rows" in node) node.rows = data.rows;
+	if (data.cols !== undefined && "cols" in node) node.cols = data.cols;
+	if (data.maxLength !== undefined && "maxLength" in node) node.maxLength = data.maxLength;
+	if (data.minLength !== undefined && "minLength" in node) node.minLength = data.minLength;
+	if (data.rowSpan !== undefined && "rowSpan" in node) node.rowSpan = data.rowSpan;
+	if (data.colSpan !== undefined && "colSpan" in node) node.colSpan = data.colSpan;
+	if (data.size !== undefined && "size" in node) node.size = data.size;
+	if (data.start !== undefined && "start" in node) node.start = data.start;
+	if (data.span !== undefined && "span" in node) node.span = data.span;
 	return node;
 }
 
@@ -346,7 +380,7 @@ export class PpermProcess extends EventTarget {
 					snapshot = { id: 1, nodeType: 1, tagName: "BODY", idName: "", className: "", text: "", attributes: {}, styleData: {}, children: [] };
 					this.#nodeIds = new Map();
 				}
-				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-28", import.meta.url));
+				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-29", import.meta.url));
 				this.#worker.addEventListener("message", event => {
 					if (settled || this.#terminated) return;
 					const message = event.data;
