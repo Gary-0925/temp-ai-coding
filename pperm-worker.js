@@ -67,6 +67,7 @@ function wrap(node) {
 	const proxy = new Proxy(node, {
 		get(t, p) {
 			if (p === "__node") return true;
+			if (p === "__raw") return t;
 			if (p === "id") return t.idName;
 			if (p === "className") return t.className;
 			if (p === "tagName" || p === "nodeName") return t.tagName;
@@ -113,7 +114,7 @@ function wrap(node) {
 	return proxy;
 }
 
-function raw(node) { return node?.__node ? node : node; }
+function raw(node) { return node?.__raw ?? node; }
 
 function makeText(text) {
 	const node = { __node: true, id: nextId++, nodeType: 3, tagName: "#text", idName: "", className: "", text, attributes: {}, styleData: {}, parent: null, children: [], connected: false };
