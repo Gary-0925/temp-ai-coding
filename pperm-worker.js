@@ -1,6 +1,7 @@
 let stopped = false;
 let nextId = 1;
-let root;
+let root = null;
+let documentProxy = null;
 const nodes = new Map();
 const listeners = new Map();
 
@@ -8,404 +9,722 @@ function emit(type, data = {}) {
 	if (!stopped) postMessage({ type, ...data });
 }
 
-function build(data, parent = null) {
-	const node = {
-		__node: true, id: data.id, nodeType: data.nodeType ?? 1,
-		tagName: data.tagName ?? "#text", idName: data.idName ?? "",
-		className: data.className ?? "", text: data.text ?? "",
-		attributes: { ...(data.attributes ?? {}) }, styleData: { ...(data.styleData ?? {}) },
-		parent, children: [], connected: true, eventHandlers: {}
-	};
-	nodes.set(node.id, node);
-	node.children = (data.children ?? []).map(child => build(child, node));
-	return node;
+function denied(name) {
+	throw new DOMException("Permission denied: " + name, "NotAllowedError");
 }
 
-const blockedElementNames = new Set([
-	"script", "iframe", "frame", "frameset", "object", "embed", "applet",
-	"base", "meta", "link", "style", "svg", "math", "portal", "fencedframe",
-	"webview"
-]);
-const blockedAttributeNames = new Set(["srcdoc", "nonce", "integrity", "is", "formaction", "action"]);
-const urlAttributeNames = new Set(["href", "src", "action", "formaction", "poster", "cite", "xlink:href", "background", "data", "manifest"]);
-const blockedPropertyNames = new Set([
-	"innerHTML", "outerHTML", "srcdoc", "insertAdjacentHTML", "setHTMLUnsafe",
-	"setHTML", "outerText", "innerText"
-]);
-const urlPropertyNames = new Set(["href", "src", "action", "formAction", "poster", "cite", "background", "data", "manifest"]);
+class PermissionGate {
+	constructor(permissions) {
+		this.permissions = permissions ?? {};
+	}
 
-function assertSafeElementName(value) {
+	check(capability = "dom") {
+		if (stopped) throw new DOMException("Process has been terminated", "AbortError");
+		if (capability === "dom" && !this.permissions.dom?.enabled) denied("dom");
+		if (capability === "fetch" && !this.permissions.network?.fetch) denied("fetch");
+		if (capability === "webSocket" && !this.permissions.network?.webSocket) denied("WebSocket");
+		if (capability === "eventSource" && !this.permissions.network?.eventSource) denied("EventSource");
+		if (capability === "xmlHttpRequest" && !this.permissions.network?.xmlHttpRequest) denied("XMLHttpRequest");
+		if (capability === "indexedDB" && !this.permissions.storage?.indexedDB) denied("indexedDB");
+		if (capability === "cache" && !this.permissions.storage?.cache) denied("Cache API");
+	}
+}
+
+const blockedElements = new Set(["script", "iframe", "frame", "frameset", "object", "embed", "applet", "base", "meta", "link", "style", "svg", "math", "portal", "fencedframe", "webview"]);
+const blockedAttributes = new Set(["srcdoc", "nonce", "integrity", "is", "action", "formaction"]);
+const urlAttributes = new Set(["href", "src", "action", "formaction", "poster", "cite", "xlink:href", "background", "data", "manifest"]);
+const blockedProperties = new Set(["innerHTML", "outerHTML", "srcdoc", "insertAdjacentHTML", "setHTMLUnsafe", "setHTML", "outerText", "__proto__", "prototype", "constructor"]);
+
+function safeElementName(value) {
 	const name = String(value).toLowerCase();
-	if (!/^[a-z][a-z0-9-]*$/.test(name) || name.includes("-") || blockedElementNames.has(name)) {
-		throw new DOMException("Element type is not permitted by the DOM bridge", "NotAllowedError");
+	if (!/^[a-z][a-z0-9-]*$/.test(name) || name.includes("-") || blockedElements.has(name)) {
+		throw new DOMException("Element type is not permitted", "NotAllowedError");
 	}
 	return name;
 }
 
-function assertSafeAttribute(name, value) {
+function safeAttribute(name, value) {
 	name = String(name).toLowerCase();
-	if (!/^[a-z_:][a-z0-9_.:-]*$/.test(name) || name.startsWith("on") || blockedAttributeNames.has(name)) {
-		throw new DOMException("Attribute is not permitted by the DOM bridge: " + name, "NotAllowedError");
+	if (!/^[a-z_:][a-z0-9_.:-]*$/.test(name) || name.startsWith("on") || blockedAttributes.has(name)) {
+		throw new DOMException("Attribute is not permitted: " + name, "NotAllowedError");
 	}
-	if (urlAttributeNames.has(name)) {
+	if (urlAttributes.has(name)) {
 		const url = String(value).trim().replace(/[\u0000-\u0020]+/g, "");
 		if (/^(javascript|vbscript):/i.test(url) || /^data:(text\/html|application\/xhtml\+xml)/i.test(url)) {
-			throw new DOMException("Executable URLs are not permitted by the DOM bridge", "NotAllowedError");
+			throw new DOMException("Executable URLs are not permitted", "NotAllowedError");
 		}
 	}
 	return name;
 }
 
-function assertSafeProperty(name, value) {
-	name = String(name);
-	if (blockedPropertyNames.has(name) || name.startsWith("__")) {
-		throw new DOMException("DOM property is not permitted by the bridge: " + name, "NotAllowedError");
-	}
-	if (/^on[a-z]+$/i.test(name)) {
-		throw new DOMException("Use a function callback for event-handler properties", "NotAllowedError");
-	}
-	if (urlPropertyNames.has(name)) assertSafeAttribute(name.toLowerCase(), value);
-	return name;
-}
-
-function assertSafeStyle(property, value) {
-	const css = String(value);
-	if (/url\s*\(|expression\s*\(|@import|-moz-binding|behavior\s*:|\\|\/\*/i.test(css)) {
-		throw new DOMException("CSS resource loading and executable CSS are not permitted by the DOM bridge", "NotAllowedError");
+function safeStyle(property, value) {
+	if (/url\s*\(|expression\s*\(|@import|-moz-binding|behavior\s*:|\\|\/\*/i.test(String(value))) {
+		throw new DOMException("Resource-loading CSS is not permitted", "NotAllowedError");
 	}
 	return String(property);
 }
 
-function matches(node, selector) {
+function selectorMatches(node, selector) {
 	if (!node || node.nodeType !== 1) return false;
 	selector = String(selector).trim();
-	if (!selector || /[\s>+~,:\[]/.test(selector)) {
-		throw new DOMException("Only simple tag, #id, and .class selectors are supported in the Worker DOM bridge", "NotSupportedError");
+	if (!selector || /[\s>+~,:[]/.test(selector)) {
+		throw new DOMException("Only simple tag, #id, and .class selectors are currently supported", "NotSupportedError");
 	}
+	if (selector === "*") return true;
 	if (selector[0] === "#") return node.idName === selector.slice(1);
 	if (selector[0] === ".") return node.className.split(/\s+/).includes(selector.slice(1));
-	return selector === "*" || node.tagName.toLowerCase() === selector.toLowerCase();
+	return node.tagName.toLowerCase() === selector.toLowerCase();
 }
 
-function query(selector, scope = root, includeScope = false) {
-	const out = [];
-	function walk(node) {
-		if ((includeScope || node !== scope) && matches(node, selector)) out.push(node);
-		node.children.forEach(walk);
-	}
-	walk(scope);
-	return out;
+function raw(node) {
+	return node instanceof PpermNode ? node._data : node;
 }
 
-function setConnected(node, connected) {
-	node.connected = connected;
-	for (const child of node.children) setConnected(child, connected);
+function setConnected(data, connected) {
+	data.connected = connected;
+	for (const child of data.children) setConnected(child, connected);
 }
 
-function serialize(node) {
-	node = raw(node);
-	return { id: node.id, nodeType: node.nodeType, tagName: node.tagName, idName: node.idName,
-		className: node.className, text: node.text, attributes: { ...node.attributes },
-		styleData: { ...node.styleData }, children: node.children.map(serialize) };
-}
-
-function mutate(op, node, data = {}) {
-	if (node.connected) emit("dom", { op, id: node.id, ...data });
-}
-
-function wrap(node) {
-	if (!node) return null;
-	const style = new Proxy({}, {
-		get(_, key) {
-			if (key === "setProperty") return (name, value, priority = "") => {
-				const property = assertSafeStyle(name, value);
-				const cssValue = String(value);
-				node.styleData[property.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] = cssValue;
-				mutate("style", node, { property, value: cssValue, priority: String(priority) });
-			};
-			if (key === "getPropertyValue") return name => node.styleData[String(name).replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] ?? "";
-			if (key === "removeProperty") return name => {
-				const property = String(name);
-				const keyName = property.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
-				const previous = node.styleData[keyName] ?? "";
-				delete node.styleData[keyName];
-				mutate("style", node, { property, value: "" });
-				return previous;
-			};
-			return node.styleData[key] ?? "";
-		},
-		set(_, key, value) {
-			const property = assertSafeStyle(key, value);
-			node.styleData[property] = String(value);
-			mutate("style", node, { property, value: String(value) });
-			return true;
-		}
-	});
-	const classList = {
-		contains: value => node.className.split(/\s+/).includes(String(value)),
-		add: (...values) => { node.className = [...new Set((node.className + " " + values.join(" ")).trim().split(/\s+/).filter(Boolean))].join(" "); node.attributes.class = node.className; mutate("attribute", node, { name: "class", value: node.className }); },
-		remove: (...values) => { const rm = new Set(values.map(String)); node.className = node.className.split(/\s+/).filter(x => x && !rm.has(x)).join(" "); node.attributes.class = node.className; mutate("attribute", node, { name: "class", value: node.className }); },
-		toggle: (value, force) => { const has = classList.contains(value); if (force === true || (!has && force !== false)) classList.add(value); else if (has) classList.remove(value); return classList.contains(value); },
-		replace: (oldValue, newValue) => {
-			if (!classList.contains(oldValue)) return false;
-			const values = node.className.split(/\s+/).filter(Boolean);
-			const index = values.indexOf(String(oldValue));
-			if (index >= 0) values[index] = String(newValue);
-			node.className = [...new Set(values)].join(" ");
-			node.attributes.class = node.className;
-			mutate("attribute", node, { name: "class", value: node.className });
-			return true;
-		}
+function serialize(data) {
+	return {
+		id: data.id, nodeType: data.nodeType, tagName: data.tagName, idName: data.idName,
+		className: data.className, text: data.text, attributes: { ...data.attributes },
+		styleData: { ...data.styleData }, children: data.children.map(serialize)
 	};
-	const proxy = new Proxy(node, {
-		get(t, p) {
-			if (p === "__node") return true;
-			if (p === "__raw") return t;
-			if (p === "id") return t.idName;
-			if (p === "className") return t.className;
-			if (p === "tagName" || p === "nodeName") return t.tagName;
-			if (p === "nodeType") return t.nodeType;
-			if (p === "textContent" || p === "innerText") return t.nodeType === 3 ? t.text : t.text + t.children.map(x => wrap(x).textContent).join("");
-			if (p === "parentNode") return wrap(t.parent);
-			if (p === "parentElement") return t.parent?.nodeType === 1 ? wrap(t.parent) : null;
-			if (p === "children") return t.children.filter(child => child.nodeType === 1).map(wrap);
-			if (p === "childNodes") return t.children.map(wrap);
-			if (p === "firstChild") return wrap(t.children[0]);
-			if (p === "lastChild") return wrap(t.children[t.children.length - 1]);
-			if (p === "firstElementChild") return wrap(t.children.find(child => child.nodeType === 1));
-			if (p === "lastElementChild") return wrap([...t.children].reverse().find(child => child.nodeType === 1));
-			if (p === "nextSibling" || p === "previousSibling" || p === "nextElementSibling" || p === "previousElementSibling") {
-				if (!t.parent) return null;
-				const siblings = p.includes("Element") ? t.parent.children.filter(child => child.nodeType === 1) : t.parent.children;
-				const index = siblings.indexOf(t);
-				if (index < 0) return null;
-				return wrap(siblings[index + (p.startsWith("next") ? 1 : -1)]);
-			}
-			if (p === "hasChildNodes") return () => t.children.length > 0;
-			if (p === "nodeValue" || p === "data") return t.nodeType === 3 || t.nodeType === 8 ? t.text : null;
-			if (p === "style") return style;
-			if (p === "classList") return classList;
-			if (p === "isConnected") return t.connected;
-			if (p === "ownerDocument") return documentProxy;
-			if (p === "getAttribute") return name => t.attributes[String(name)] ?? null;
-			if (p === "hasAttribute") return name => Object.hasOwn(t.attributes, String(name));
-			if (p === "setAttribute") return (name, value) => {
-				name = assertSafeAttribute(name, value);
-				value = String(value);
-				t.attributes[name] = value;
-				if (name === "id") t.idName = value;
-				if (name === "class") t.className = value;
-				if (name === "style") assertSafeStyle("style", value);
-				mutate("attribute", t, { name, value });
-			};
-			if (p === "removeAttribute") return name => {
-				name = String(name).toLowerCase();
-				if (name.startsWith("on") || blockedAttributeNames.has(name)) throw new DOMException("Attribute is not permitted by the DOM bridge: " + name, "NotAllowedError");
-				delete t.attributes[name];
-				if (name === "id") t.idName = "";
-				if (name === "class") t.className = "";
-				mutate("removeAttribute", t, { name });
-			};
-			if (p === "matches") return selector => matches(t, selector);
-			if (p === "querySelector") return selector => wrap(query(selector, t)[0]);
-			if (p === "querySelectorAll") return selector => query(selector, t).map(wrap);
-			if (p === "closest") return selector => { let n = t; while (n) { if (matches(n, selector)) return wrap(n); n = n.parent; } return null; };
-			if (p === "appendChild") return child => append(t, raw(child));
-			if (p === "append") return (...args) => { for (const item of args) append(t, item?.__node ? raw(item) : makeText(String(item))); };
-			if (p === "prepend") return (...args) => {
-				const before = t.children[0] ?? null;
-				for (const item of args) insert(t, item?.__node ? raw(item) : makeText(String(item)), before);
-			};
-			if (p === "insertBefore") return (child, before) => insert(t, raw(child), before == null ? null : raw(before));
-			if (p === "replaceChild") return (child, oldChild) => {
-				const old = raw(oldChild);
-				if (!t.children.includes(old)) throw new DOMException("Node is not a child", "NotFoundError");
-				if (raw(child) === old) return oldChild;
-				insert(t, raw(child), old);
-				remove(t, old);
-				return oldChild;
-			};
-			if (p === "before" || p === "after") return (...args) => {
-				if (!t.parent) return;
-				const before = p === "before" ? t : t.parent.children[t.parent.children.indexOf(t) + 1] ?? null;
-				for (const item of args) insert(t.parent, item?.__node ? raw(item) : makeText(String(item)), before);
-			};
-			if (p === "removeChild") return child => remove(t, raw(child));
-			if (p === "replaceChildren") return (...args) => { [...t.children].forEach(child => remove(t, child)); args.forEach(item => append(t, item?.__node ? raw(item) : makeText(String(item)))); };
-			if (p === "remove") return () => { if (t === root) throw new DOMException("Cannot remove the permitted root", "NotAllowedError"); if (t.parent) remove(t.parent, t); };
-			if (p === "addEventListener") return (type, callback, options) => { if (typeof callback !== "function") return; const listenerId = nextId++; listeners.set(listenerId, { node: t, type: String(type), callback, once: !!options?.once }); emit("listen", { id: t.id, listenerId, eventType: String(type), once: !!options?.once }); };
-			if (p === "removeEventListener") return (type, callback) => { for (const [id, l] of listeners) if (l.node === t && l.type === String(type) && l.callback === callback) { listeners.delete(id); emit("unlisten", { id: t.id, listenerId: id, eventType: l.type }); } };
-			if (p === "contains") return other => { let n = raw(other); while (n) { if (n === t) return true; n = n.parent; } return false; };
-			if (/^on[a-z]+$/i.test(String(p))) return t.eventHandlers[p]?.callback ?? null;
-			if (p === "click") return () => {
-				const event = Object.freeze({ type: "click", target: wrap(t), currentTarget: wrap(t), detail: null });
-				for (const [id, listener] of [...listeners]) {
-					if (listener.node !== t || listener.type !== "click") continue;
-					listener.callback.call(wrap(t), event);
-					if (listener.once) listeners.delete(id);
-				}
-			};
-			if (p === "focus" || p === "blur") return () => mutate(p, t);
-			if (p === "cloneNode") return deep => {
-				const data = serialize(t);
-				const renew = item => { item.id = nextId++; if (!deep) item.children = []; else item.children.forEach(renew); };
-				renew(data);
-				const copy = build(data);
-				setConnected(copy, false);
-				return wrap(copy);
-			};
-			return undefined;
-		},
-		set(t, p, value) {
-			if (/^on[a-z]+$/i.test(String(p))) {
-				const property = String(p);
-				const previous = t.eventHandlers[property];
-				if (previous) {
-					listeners.delete(previous.listenerId);
-					emit("unlisten", { id: t.id, listenerId: previous.listenerId, eventType: property.slice(2) });
-					delete t.eventHandlers[property];
-				}
-				if (value == null) return true;
-				if (typeof value !== "function") throw new TypeError(property + " must be a function or null");
-				const eventType = property.slice(2).toLowerCase();
-				const listenerId = nextId++;
-				listeners.set(listenerId, { node: t, type: eventType, callback: value, once: false });
-				t.eventHandlers[property] = { listenerId, callback: value };
-				emit("listen", { id: t.id, listenerId, eventType, once: false });
+}
+
+function makeData(input = {}, parent = null) {
+	const data = {
+		id: input.id ?? nextId++, nodeType: input.nodeType ?? 1,
+		tagName: input.tagName ?? "#text", idName: input.idName ?? "",
+		className: input.className ?? "", text: input.text ?? "",
+		attributes: { ...(input.attributes ?? {}) }, styleData: { ...(input.styleData ?? {}) },
+		parent, children: [], connected: input.connected ?? true
+	};
+	nodes.set(data.id, data);
+	data.children = (input.children ?? []).map(child => makeData(child, data));
+	return data;
+}
+
+function emitMutation(data, op, extra = {}) {
+	if (data.connected) emit("dom", { op, id: data.id, ...extra });
+}
+
+class PpermStyle {
+	constructor(owner, gate) {
+		this.owner = owner;
+		this.gate = gate;
+		return new Proxy(this, {
+			get: (target, property) => {
+				if (typeof property === "symbol" || property in target) return Reflect.get(target, property);
+				target.gate.check("dom");
+				return target.owner.styleData[String(property)] ?? "";
+			},
+			set: (target, property, value) => {
+				target.gate.check("dom");
+				const name = safeStyle(property, value);
+				target.owner.styleData[name] = String(value);
+				emitMutation(target.owner, "style", { property: name, value: String(value) });
 				return true;
 			}
-			if (p === "id") { t.idName = String(value); t.attributes.id = t.idName; mutate("attribute", t, { name: "id", value: t.idName }); }
-			else if (p === "className") { t.className = String(value); t.attributes.class = t.className; mutate("attribute", t, { name: "class", value: t.className }); }
-			else if (p === "textContent" || p === "innerText") {
-				for (const child of t.children) { child.parent = null; setConnected(child, false); }
-				t.children = [];
-				t.text = String(value);
-				mutate("text", t, { value: t.text });
+		});
+	}
+
+	setProperty(name, value, priority = "") {
+		this.gate.check("dom");
+		const property = safeStyle(name, value);
+		const cssValue = String(value);
+		this.owner.styleData[property.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = cssValue;
+		emitMutation(this.owner, "style", { property, value: cssValue, priority: String(priority) });
+	}
+
+	getPropertyValue(name) {
+		this.gate.check("dom");
+		return this.owner.styleData[String(name).replace(/-([a-z])/g, (_, c) => c.toUpperCase())] ?? "";
+	}
+
+	removeProperty(name) {
+		this.gate.check("dom");
+		const key = String(name).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+		const oldValue = this.owner.styleData[key] ?? "";
+		delete this.owner.styleData[key];
+		emitMutation(this.owner, "style", { property: String(name), value: "" });
+		return oldValue;
+	}
+}
+
+class PpermTokenList {
+	constructor(owner, gate) {
+		this.owner = owner;
+		this.gate = gate;
+	}
+
+	_values() {
+		this.gate.check("dom");
+		return this.owner.className.split(/\s+/).filter(Boolean);
+	}
+
+	_commit(values) {
+		this.gate.check("dom");
+		this.owner.className = [...new Set(values)].join(" ");
+		this.owner.attributes.class = this.owner.className;
+		emitMutation(this.owner, "attribute", { name: "class", value: this.owner.className });
+	}
+
+	contains(value) {
+		this.gate.check("dom");
+		return this._values().includes(String(value));
+	}
+
+	add(...values) {
+		this.gate.check("dom");
+		this._commit([...this._values(), ...values.map(String)]);
+	}
+
+	remove(...values) {
+		this.gate.check("dom");
+		const removeSet = new Set(values.map(String));
+		this._commit(this._values().filter(value => !removeSet.has(value)));
+	}
+
+	toggle(value, force) {
+		this.gate.check("dom");
+		const values = this._values();
+		const has = values.includes(String(value));
+		if (force === true || (!has && force !== false)) this._commit([...values, String(value)]);
+		else if (has) this._commit(values.filter(item => item !== String(value)));
+		return this._values().includes(String(value));
+	}
+
+	replace(oldValue, newValue) {
+		this.gate.check("dom");
+		const values = this._values();
+		const index = values.indexOf(String(oldValue));
+		if (index < 0) return false;
+		values[index] = String(newValue);
+		this._commit(values);
+		return true;
+	}
+
+	get value() {
+		this.gate.check("dom");
+		return this.owner.className;
+	}
+
+	set value(value) {
+		this.gate.check("dom");
+		this.owner.className = String(value);
+		this.owner.attributes.class = this.owner.className;
+		emitMutation(this.owner, "attribute", { name: "class", value: this.owner.className });
+	}
+
+	[Symbol.iterator]() {
+		this.gate.check("dom");
+		return this._values()[Symbol.iterator]();
+	}
+}
+
+class PpermNode {
+	constructor(data, gate) {
+		this._data = data;
+		this._gate = gate;
+		this._style = new PpermStyle(data, gate);
+		this._classList = new PpermTokenList(data, gate);
+		this._eventProperties = new Map();
+		return new Proxy(this, {
+			get: (target, property, receiver) => {
+				if (typeof property === "symbol" || property in target) return Reflect.get(target, property, receiver);
+				target._gate.check("dom");
+				return target._getProperty(property);
+			},
+			set: (target, property, value) => {
+				target._gate.check("dom");
+				return target._setProperty(property, value);
 			}
-			else if (p === "nodeValue" || p === "data") {
-				if (t.nodeType !== 3 && t.nodeType !== 8) return true;
-				t.text = String(value);
-				mutate("text", t, { value: t.text });
+		});
+	}
+
+	_getProperty(property) {
+		this._gate.check("dom");
+		const d = this._data;
+		switch (property) {
+			case "id": return d.idName;
+			case "className": return d.className;
+			case "tagName": case "nodeName": return d.tagName;
+			case "nodeType": return d.nodeType;
+			case "textContent": return d.nodeType === 3 || d.nodeType === 8 ? d.text : d.text + d.children.map(child => new PpermNode(child, this._gate).textContent).join("");
+			case "parentNode": return d.parent ? new PpermNode(d.parent, this._gate) : null;
+			case "parentElement": return d.parent?.nodeType === 1 ? new PpermNode(d.parent, this._gate) : null;
+			case "children": return d.children.filter(child => child.nodeType === 1).map(child => new PpermNode(child, this._gate));
+			case "childNodes": return d.children.map(child => new PpermNode(child, this._gate));
+			case "firstChild": return d.children[0] ? new PpermNode(d.children[0], this._gate) : null;
+			case "lastChild": return d.children.length ? new PpermNode(d.children[d.children.length - 1], this._gate) : null;
+			case "firstElementChild": { const n = d.children.find(child => child.nodeType === 1); return n ? new PpermNode(n, this._gate) : null; }
+			case "lastElementChild": { const n = [...d.children].reverse().find(child => child.nodeType === 1); return n ? new PpermNode(n, this._gate) : null; }
+			case "nextSibling": case "previousSibling": case "nextElementSibling": case "previousElementSibling": {
+				if (!d.parent) return null;
+				const siblings = property.includes("Element") ? d.parent.children.filter(child => child.nodeType === 1) : d.parent.children;
+				const index = siblings.indexOf(d);
+				const sibling = siblings[index + (property.startsWith("next") ? 1 : -1)];
+				return sibling ? new PpermNode(sibling, this._gate) : null;
 			}
-			else if (p === "innerHTML") throw new DOMException("innerHTML is not supported; use textContent or createElement", "NotSupportedError");
-			else {
-				const property = assertSafeProperty(p, value);
-				if (typeof value === "function" || (value !== null && typeof value === "object")) {
-					throw new TypeError("DOM properties bridged to the main thread must use serializable primitive values");
-				}
-				t[property] = value;
-				mutate("property", t, { property, value });
+			case "nodeValue": case "data": return d.nodeType === 3 || d.nodeType === 8 ? d.text : null;
+			case "style": return this._style;
+			case "classList": return this._classList;
+			case "isConnected": return d.connected;
+			case "ownerDocument": return documentProxy;
+			case "childrenCount": return d.children.length;
+			case "hasChildNodes": return () => { this._gate.check("dom"); return d.children.length > 0; };
+			case "getAttribute": return name => this.getAttribute(name);
+			case "hasAttribute": return name => this.hasAttribute(name);
+			case "setAttribute": return (name, value) => this.setAttribute(name, value);
+			case "removeAttribute": return name => this.removeAttribute(name);
+			case "matches": return selector => this.matches(selector);
+			case "querySelector": return selector => this.querySelector(selector);
+			case "querySelectorAll": return selector => this.querySelectorAll(selector);
+			case "closest": return selector => this.closest(selector);
+			case "appendChild": return child => this.appendChild(child);
+			case "append": return (...items) => this.append(...items);
+			case "prepend": return (...items) => this.prepend(...items);
+			case "insertBefore": return (child, before) => this.insertBefore(child, before);
+			case "replaceChild": return (child, oldChild) => this.replaceChild(child, oldChild);
+			case "before": return (...items) => this.before(...items);
+			case "after": return (...items) => this.after(...items);
+			case "removeChild": return child => this.removeChild(child);
+			case "replaceChildren": return (...items) => this.replaceChildren(...items);
+			case "remove": return () => this.remove();
+			case "addEventListener": return (type, callback, options) => this.addEventListener(type, callback, options);
+			case "removeEventListener": return (type, callback, options) => this.removeEventListener(type, callback, options);
+			case "contains": return other => this.contains(other);
+			case "click": return () => this.click();
+			case "focus": return () => this.focus();
+			case "blur": return () => this.blur();
+			case "cloneNode": return deep => this.cloneNode(deep);
+			case "getBoundingClientRect": return () => this.getBoundingClientRect();
+			case "dispatchEvent": return event => this.dispatchEvent(event);
+			case "attributes": return Object.entries(d.attributes).map(([name, value]) => ({ name, value }));
+			case "innerHTML": case "outerHTML": case "srcdoc": case "insertAdjacentHTML": case "setHTMLUnsafe": case "setHTML":
+				return () => denied(property);
+			default:
+				if (/^on[a-z]+$/i.test(String(property))) return this._eventProperties.get(String(property)) ?? null;
+				if (Object.hasOwn(d.attributes, String(property).toLowerCase())) return d.attributes[String(property).toLowerCase()];
+				return undefined;
+		}
+	}
+
+	_setProperty(property, value) {
+		this._gate.check("dom");
+		const d = this._data;
+		if (typeof property === "string" && /^on[a-z]+$/i.test(property)) {
+			const old = this._eventProperties.get(property);
+			if (old) this.removeEventListener(property.slice(2), old);
+			if (value == null) { this._eventProperties.delete(property); return true; }
+			if (typeof value !== "function") throw new TypeError(property + " must be a function or null");
+			this._eventProperties.set(property, value);
+			this.addEventListener(property.slice(2).toLowerCase(), value);
+			return true;
+		}
+		if (blockedProperties.has(String(property)) || String(property).startsWith("__")) denied(String(property));
+		if (["id", "className"].includes(property)) {
+			const name = property === "id" ? "id" : "class";
+			const text = String(value);
+			if (name === "id") d.idName = text; else d.className = text;
+			d.attributes[name] = text;
+			emitMutation(d, "attribute", { name, value: text });
+			return true;
+		}
+		if (property === "textContent" || property === "innerText") {
+			for (const child of d.children) { child.parent = null; setConnected(child, false); }
+			d.children = [];
+			d.text = String(value);
+			emitMutation(d, "text", { value: d.text });
+			return true;
+		}
+		if (property === "nodeValue" || property === "data") {
+			if (d.nodeType === 3 || d.nodeType === 8) {
+				d.text = String(value);
+				emitMutation(d, "text", { value: d.text });
 			}
 			return true;
 		}
-	});
-	return proxy;
-}
-
-function raw(node) { return node?.__raw ?? node; }
-
-function makeText(text) {
-	const node = { __node: true, id: nextId++, nodeType: 3, tagName: "#text", idName: "", className: "", text, attributes: {}, styleData: {}, parent: null, children: [], connected: false };
-	nodes.set(node.id, node);
-	return node;
-}
-
-function append(parent, child) {
-	if (!child?.__node) throw new TypeError("appendChild expects a pperm node");
-	if (child.nodeType === 11) {
-		for (const item of [...child.children]) append(parent, item);
-		child.children = [];
-		return wrap(child);
+		if (["href", "src", "poster", "cite", "background", "data", "manifest", "action", "formAction"].includes(String(property))) {
+			safeAttribute(String(property).toLowerCase(), value);
+		}
+		if (typeof value === "function" || (value !== null && typeof value === "object")) {
+			throw new TypeError("This DOM property requires a serializable primitive value");
+		}
+		d[property] = value;
+		emitMutation(d, "property", { property: String(property), value });
+		return true;
 	}
-	if (child === root) throw new DOMException("Cannot move the permitted root", "NotAllowedError");
-	if (child.parent) remove(child.parent, child);
-	child.parent = parent;
-	setConnected(child, parent.connected);
-	parent.children.push(child);
-	if (child.connected) emit("dom", { op: "append", id: parent.id, child: serialize(child) });
-	return wrap(child);
-}
 
-function insert(parent, child, before) {
-	if (!child?.__node) throw new TypeError("insertBefore expects a pperm node");
-	if (before != null && before.parent !== parent) throw new DOMException("Reference node is not a child", "NotFoundError");
-	if (child.nodeType === 11) {
-		for (const item of [...child.children]) insert(parent, item, before);
-		child.children = [];
-		return wrap(child);
+	getAttribute(name) {
+		this._gate.check("dom");
+		return this._data.attributes[String(name).toLowerCase()] ?? null;
 	}
-	if (child === root) throw new DOMException("Cannot move the permitted root", "NotAllowedError");
-	if (child === before) return wrap(child);
-	if (child.parent) remove(child.parent, child);
-	child.parent = parent;
-	setConnected(child, parent.connected);
-	const index = before == null ? -1 : parent.children.indexOf(before);
-	if (index < 0) parent.children.push(child);
-	else parent.children.splice(index, 0, child);
-	if (child.connected) emit("dom", { op: "insert", id: parent.id, child: serialize(child), beforeId: before?.id ?? null });
-	return wrap(child);
-}
 
-function remove(parent, child) {
-	const i = parent.children.indexOf(child);
-	if (i < 0) throw new DOMException("Node is not a child", "NotFoundError");
-	if (child === root) throw new DOMException("Cannot remove the permitted root", "NotAllowedError");
-	parent.children.splice(i, 1);
-	child.parent = null;
-	setConnected(child, false);
-	if (parent.connected) emit("dom", { op: "remove", id: parent.id, childId: child.id });
-	return wrap(child);
-}
-
-const documentProxy = new Proxy({}, {
-	get(_, p) {
-		if (p === "body" || p === "documentElement") return wrap(root);
-		if (p === "querySelector") return selector => wrap(query(selector, root, true)[0]);
-		if (p === "querySelectorAll") return selector => query(selector, root, true).map(wrap);
-		if (p === "getElementById") return id => wrap(query("#" + String(id), root, true)[0]);
-		if (p === "getElementsByClassName") return name => query("." + String(name).trim().split(/\s+/)[0], root, true).map(wrap);
-		if (p === "getElementsByTagName") return name => query(String(name), root, true).map(wrap);
-		if (p === "createElement") return tag => { const safeTag = assertSafeElementName(tag); const n = build({ id: nextId++, tagName: safeTag.toUpperCase() }); n.connected = false; return wrap(n); };
-		if (p === "createTextNode") return text => wrap(makeText(String(text)));
-		if (p === "createComment") return text => { const n = makeText(String(text)); n.nodeType = 8; n.tagName = "#comment"; return wrap(n); };
-		if (p === "createDocumentFragment") { const n = build({ id: nextId++, nodeType: 11, tagName: "#fragment" }); setConnected(n, false); return wrap(n); }
-		if (p === "nodeType") return 9;
-		if (p === "addEventListener" || p === "removeEventListener") return wrap(root)[p];
-		return undefined;
-	},
-	set(_, p, value) {
-		if (p === "title") { emit("documentTitle", { value: String(value) }); return true; }
-		throw new DOMException("Unsupported document property", "NotAllowedError");
+	hasAttribute(name) {
+		this._gate.check("dom");
+		return Object.hasOwn(this._data.attributes, String(name).toLowerCase());
 	}
-});
+
+	setAttribute(name, value) {
+		this._gate.check("dom");
+		const safeName = safeAttribute(name, value);
+		if (safeName === "style") safeStyle("style", value);
+		const text = String(value);
+		this._data.attributes[safeName] = text;
+		if (safeName === "id") this._data.idName = text;
+		if (safeName === "class") this._data.className = text;
+		emitMutation(this._data, "attribute", { name: safeName, value: text });
+	}
+
+	removeAttribute(name) {
+		this._gate.check("dom");
+		const safeName = String(name).toLowerCase();
+		if (safeName.startsWith("on") || blockedAttributes.has(safeName)) denied("attribute " + safeName);
+		delete this._data.attributes[safeName];
+		if (safeName === "id") this._data.idName = "";
+		if (safeName === "class") this._data.className = "";
+		emitMutation(this._data, "removeAttribute", { name: safeName });
+	}
+
+	matches(selector) {
+		this._gate.check("dom");
+		return selectorMatches(this._data, selector);
+	}
+
+	querySelector(selector) {
+		this._gate.check("dom");
+		return this.querySelectorAll(selector)[0] ?? null;
+	}
+
+	querySelectorAll(selector) {
+		this._gate.check("dom");
+		const results = [];
+		const walk = node => {
+			for (const child of node.children) {
+				if (selectorMatches(child, selector)) results.push(new PpermNode(child, this._gate));
+				walk(child);
+			}
+		};
+		walk(this._data);
+		return results;
+	}
+
+	closest(selector) {
+		this._gate.check("dom");
+		let node = this._data;
+		while (node) {
+			if (selectorMatches(node, selector)) return new PpermNode(node, this._gate);
+			node = node.parent;
+		}
+		return null;
+	}
+
+	_appendRaw(child, before = null) {
+		this._gate.check("dom");
+		const parent = this._data;
+		if (!(child instanceof PpermNode)) throw new TypeError("Expected a pperm Node");
+		const item = child._data;
+		if (item === root) denied("moving the permitted root");
+		if (item === parent || this.contains(child)) throw new DOMException("The operation would create a cycle", "HierarchyRequestError");
+		if (before && before.parent !== parent) throw new DOMException("Reference node is not a child", "NotFoundError");
+		if (item.nodeType === 11) {
+			for (const nested of [...item.children]) this._appendRaw(new PpermNode(nested, this._gate), before ? new PpermNode(before, this._gate) : null);
+			item.children = [];
+			return child;
+		}
+		if (item.parent) new PpermNode(item.parent, this._gate).removeChild(child);
+		item.parent = parent;
+		setConnected(item, parent.connected);
+		const index = before ? parent.children.indexOf(before) : -1;
+		if (index < 0) parent.children.push(item);
+		else parent.children.splice(index, 0, item);
+		if (item.connected) emit("dom", { op: before ? "insert" : "append", id: parent.id, child: serialize(item), beforeId: before?.id ?? null });
+		return child;
+	}
+
+	appendChild(child) {
+		this._gate.check("dom");
+		return this._appendRaw(child);
+	}
+
+	append(...items) {
+		this._gate.check("dom");
+		for (const item of items) this._appendRaw(item instanceof PpermNode ? item : new PpermNode(makeData({ nodeType: 3, tagName: "#text", text: String(item), connected: false }), this._gate));
+	}
+
+	prepend(...items) {
+		this._gate.check("dom");
+		const before = this._data.children[0] ?? null;
+		for (const item of [...items].reverse()) this._appendRaw(item instanceof PpermNode ? item : new PpermNode(makeData({ nodeType: 3, tagName: "#text", text: String(item), connected: false }), this._gate), before);
+	}
+
+	insertBefore(child, before) {
+		this._gate.check("dom");
+		return this._appendRaw(child, before == null ? null : raw(before));
+	}
+
+	replaceChild(child, oldChild) {
+		this._gate.check("dom");
+		const old = raw(oldChild);
+		if (!this._data.children.includes(old)) throw new DOMException("Node is not a child", "NotFoundError");
+		if (raw(child) === old) return oldChild;
+		this._appendRaw(child, old);
+		this.removeChild(oldChild);
+		return oldChild;
+	}
+
+	before(...items) {
+		this._gate.check("dom");
+		const parent = this._data.parent;
+		if (!parent) return;
+		const before = new PpermNode(parent, this._gate);
+		for (const item of items) before.insertBefore(item instanceof PpermNode ? item : new PpermNode(makeData({ nodeType: 3, tagName: "#text", text: String(item), connected: false }), this._gate), this);
+	}
+
+	after(...items) {
+		this._gate.check("dom");
+		const parent = this._data.parent;
+		if (!parent) return;
+		const siblings = parent.children;
+		const next = siblings[siblings.indexOf(this._data) + 1] ?? null;
+		for (const item of items) new PpermNode(parent, this._gate).insertBefore(item instanceof PpermNode ? item : new PpermNode(makeData({ nodeType: 3, tagName: "#text", text: String(item), connected: false }), this._gate), next ? new PpermNode(next, this._gate) : null);
+	}
+
+	removeChild(child) {
+		this._gate.check("dom");
+		const item = raw(child);
+		const index = this._data.children.indexOf(item);
+		if (index < 0) throw new DOMException("Node is not a child", "NotFoundError");
+		if (item === root) denied("removing the permitted root");
+		this._data.children.splice(index, 1);
+		item.parent = null;
+		setConnected(item, false);
+		emitMutation(this._data, "remove", { childId: item.id });
+		return child;
+	}
+
+	replaceChildren(...items) {
+		this._gate.check("dom");
+		for (const child of [...this._data.children]) this.removeChild(new PpermNode(child, this._gate));
+		this.append(...items);
+	}
+
+	remove() {
+		this._gate.check("dom");
+		if (this._data === root) denied("removing the permitted root");
+		if (this._data.parent) new PpermNode(this._data.parent, this._gate).removeChild(this);
+	}
+
+	contains(other) {
+		this._gate.check("dom");
+		let node = raw(other);
+		while (node) {
+			if (node === this._data) return true;
+			node = node.parent;
+		}
+		return false;
+	}
+
+	addEventListener(type, callback, options = {}) {
+		this._gate.check("dom");
+		if (callback == null) return;
+		if (typeof callback !== "function" && typeof callback.handleEvent !== "function") throw new TypeError("Listener must be a function or an object with handleEvent");
+		const listenerId = nextId++;
+		const record = { node: this._data, type: String(type), callback, once: typeof options === "boolean" ? false : !!options?.once, capture: typeof options === "boolean" ? options : !!options?.capture };
+		listeners.set(listenerId, record);
+		emit("listen", { id: this._data.id, listenerId, eventType: record.type, once: record.once, capture: record.capture });
+	}
+
+	removeEventListener(type, callback, options = {}) {
+		this._gate.check("dom");
+		const capture = typeof options === "boolean" ? options : !!options?.capture;
+		for (const [id, record] of listeners) {
+			if (record.node === this._data && record.type === String(type) && record.callback === callback && record.capture === capture) {
+				listeners.delete(id);
+				emit("unlisten", { id: this._data.id, listenerId: id, eventType: record.type });
+			}
+		}
+	}
+
+	dispatchEvent(event) {
+		this._gate.check("dom");
+		if (!event || typeof event.type !== "string") throw new TypeError("dispatchEvent expects an Event-like object");
+		const eventData = { type: event.type, detail: event.detail ?? null, bubbles: !!event.bubbles, cancelable: !!event.cancelable };
+		emit("dispatch", { id: this._data.id, event: eventData });
+		return true;
+	}
+
+	click() {
+		this._gate.check("dom");
+		emit("dispatch", { id: this._data.id, event: { type: "click", detail: null, bubbles: true, cancelable: true } });
+	}
+
+	focus() {
+		this._gate.check("dom");
+		emitMutation(this._data, "focus");
+	}
+
+	blur() {
+		this._gate.check("dom");
+		emitMutation(this._data, "blur");
+	}
+
+	cloneNode(deep = false) {
+		this._gate.check("dom");
+		const copy = serialize(this._data);
+		const renew = item => {
+			item.id = nextId++;
+			if (item.nodeType === 1) { item.idName = ""; item.attributes = { ...item.attributes }; delete item.attributes.id; }
+			if (!deep) item.children = [];
+			else item.children.forEach(renew);
+		};
+		renew(copy);
+		const data = makeData({ ...copy, connected: false });
+		setConnected(data, false);
+		return new PpermNode(data, this._gate);
+	}
+
+	getBoundingClientRect() {
+		this._gate.check("dom");
+		throw new DOMException("Layout measurements are asynchronous across the Worker bridge and are not supported yet", "NotSupportedError");
+	}
+}
+
+class PpermDocument {
+	constructor(gate) {
+		this._gate = gate;
+		return new Proxy(this, {
+			get: (target, property, receiver) => {
+				if (typeof property === "symbol" || property in target) return Reflect.get(target, property, receiver);
+				target._gate.check("dom");
+				return target._get(property);
+			},
+			set: (target, property, value) => {
+				target._gate.check("dom");
+				if (property === "title") { emit("documentTitle", { value: String(value) }); return true; }
+				throw new DOMException("Document property is read-only or unsupported: " + String(property), "NotSupportedError");
+			}
+		});
+	}
+
+	_get(property) {
+		this._gate.check("dom");
+		switch (property) {
+			case "body": case "documentElement": return new PpermNode(root, this._gate);
+			case "nodeType": return 9;
+			case "title": return "";
+			case "querySelector": return selector => this.querySelector(selector);
+			case "querySelectorAll": return selector => this.querySelectorAll(selector);
+			case "getElementById": return id => this.querySelector("#" + String(id));
+			case "getElementsByClassName": return name => this.querySelectorAll("." + String(name).trim().split(/\s+/)[0]);
+			case "getElementsByTagName": return name => this.querySelectorAll(String(name));
+			case "createElement": return tag => this.createElement(tag);
+			case "createTextNode": return text => this.createTextNode(text);
+			case "createComment": return text => this.createComment(text);
+			case "createDocumentFragment": return () => this.createDocumentFragment();
+			case "createEvent": return () => { this._gate.check("dom"); throw new DOMException("Use dispatchEvent with an Event-like object", "NotSupportedError"); };
+			case "addEventListener": return (type, callback, options) => this.body.addEventListener(type, callback, options);
+			case "removeEventListener": return (type, callback, options) => this.body.removeEventListener(type, callback, options);
+			default: return undefined;
+		}
+	}
+
+	querySelector(selector) {
+		this._gate.check("dom");
+		return this.querySelectorAll(selector)[0] ?? null;
+	}
+
+	querySelectorAll(selector) {
+		this._gate.check("dom");
+		const out = [];
+		const walk = data => {
+			if (selectorMatches(data, selector)) out.push(new PpermNode(data, this._gate));
+			data.children.forEach(walk);
+		};
+		walk(root);
+		return out;
+	}
+
+	createElement(tagName, options) {
+		this._gate.check("dom");
+		if (options != null) throw new DOMException("Customized built-in elements are not supported", "NotSupportedError");
+		const tag = safeElementName(tagName);
+		return new PpermNode(makeData({ tagName: tag.toUpperCase(), connected: false }), this._gate);
+	}
+
+	createTextNode(text) {
+		this._gate.check("dom");
+		return new PpermNode(makeData({ nodeType: 3, tagName: "#text", text: String(text), connected: false }), this._gate);
+	}
+
+	createComment(text) {
+		this._gate.check("dom");
+		return new PpermNode(makeData({ nodeType: 8, tagName: "#comment", text: String(text), connected: false }), this._gate);
+	}
+
+	createDocumentFragment() {
+		this._gate.check("dom");
+		return new PpermNode(makeData({ nodeType: 11, tagName: "#fragment", connected: false }), this._gate);
+	}
+}
+
+function errorPayload(error) {
+	return { name: error?.name ?? "Error", message: error?.message ?? String(error), stack: error?.stack };
+}
 
 self.addEventListener("message", event => {
-	const m = event.data;
-	if (m?.type === "init") {
-		root = build(m.snapshot);
-		nextId = Math.max(nextId, ...Array.from(nodes.keys(), id => Number(id) + 1));
-		const deny = name => new Proxy(function() { throw new DOMException(name + " is not permitted", "NotAllowedError"); }, { construct() { throw new DOMException(name + " is not permitted", "NotAllowedError"); } });
-		const allowed = m.permissions;
-		const guard = (ok, name, value) => ok ? value : deny(name);
-		const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
+	const message = event.data;
+	if (message?.type === "init") {
 		try {
-			const run = new AsyncFunction("postMessage", "permissions", "document", "fetch", "WebSocket", "EventSource", "XMLHttpRequest", "indexedDB", "caches", m.code);
-			Promise.resolve(run(
-				value => emit("userMessage", { value }), allowed,
-				allowed.dom.enabled ? documentProxy : undefined,
-				guard(allowed.network.fetch, "fetch", self.fetch?.bind(self)),
-				guard(allowed.network.webSocket, "WebSocket", self.WebSocket),
-				guard(allowed.network.eventSource, "EventSource", self.EventSource),
-				guard(allowed.network.xmlHttpRequest, "XMLHttpRequest", self.XMLHttpRequest),
-				guard(allowed.storage.indexedDB, "indexedDB", self.indexedDB),
-				guard(allowed.storage.cache, "caches", self.caches)
-			)).then(value => emit("done", { value })).catch(error => emit("error", { error: { name: error?.name, message: error?.message, stack: error?.stack } }));
-		} catch (error) { emit("error", { error: { name: error?.name, message: error?.message, stack: error?.stack } }); }
-	} else if (m?.type === "event") {
-		const l = listeners.get(m.listenerId);
-		if (!l || stopped) return;
-		try { l.callback.call(wrap(l.node), Object.freeze({ type: m.event.type, target: wrap(l.node), currentTarget: wrap(l.node), detail: m.event.detail ?? null })); }
-		catch (error) { emit("error", { error: { name: error?.name, message: error?.message, stack: error?.stack } }); }
-		if (l.once) listeners.delete(m.listenerId);
-	} else if (m?.type === "shutdown") { stopped = true; close(); }
+			const permissions = message.permissions ?? {};
+			const gate = new PermissionGate(permissions);
+			root = makeData(message.snapshot);
+			nextId = Math.max(nextId, ...Array.from(nodes.keys(), id => Number(id) + 1));
+			documentProxy = new PpermDocument(gate);
+			const deniedGlobal = name => new Proxy(function() { gate.check(name); denied(name); }, {
+				construct() { gate.check(name); denied(name); },
+				get(_target, property) { gate.check(name); denied(name + "." + String(property)); }
+			});
+			const guarded = (name, capability, value) => new Proxy(value, {
+				apply(target, thisArg, args) { gate.check(capability); return Reflect.apply(target, thisArg, args); },
+				construct(target, args, newTarget) { gate.check(capability); return Reflect.construct(target, args, newTarget); },
+				get(target, property, receiver) { gate.check(capability); return Reflect.get(target, property, receiver); }
+			});
+			const fetchApi = permissions.network?.fetch ? guarded("fetch", "fetch", self.fetch.bind(self)) : deniedGlobal("fetch");
+			const WebSocketApi = permissions.network?.webSocket ? guarded("WebSocket", "webSocket", self.WebSocket) : deniedGlobal("WebSocket");
+			const EventSourceApi = permissions.network?.eventSource ? guarded("EventSource", "eventSource", self.EventSource) : deniedGlobal("EventSource");
+			const XhrApi = permissions.network?.xmlHttpRequest ? guarded("XMLHttpRequest", "xmlHttpRequest", self.XMLHttpRequest) : deniedGlobal("XMLHttpRequest");
+			const indexedDBApi = permissions.storage?.indexedDB ? new Proxy(self.indexedDB, { get(target, property, receiver) { gate.check("indexedDB"); return Reflect.get(target, property, receiver); } }) : deniedGlobal("indexedDB");
+			const cachesApi = permissions.storage?.cache ? new Proxy(self.caches, { get(target, property, receiver) { gate.check("cache"); return Reflect.get(target, property, receiver); } }) : deniedGlobal("caches");
+			const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
+			const run = new AsyncFunction("postMessage", "permissions", "document", "fetch", "WebSocket", "EventSource", "XMLHttpRequest", "indexedDB", "caches", message.code);
+			Promise.resolve(run(value => emit("userMessage", { value }), permissions, permissions.dom?.enabled ? documentProxy : undefined, fetchApi, WebSocketApi, EventSourceApi, XhrApi, indexedDBApi, cachesApi))
+				.then(value => emit("done", { value })).catch(error => emit("error", { error: errorPayload(error) }));
+		} catch (error) {
+			emit("error", { error: errorPayload(error) });
+		}
+	} else if (message?.type === "event") {
+		const record = listeners.get(message.listenerId);
+		if (!record || stopped) return;
+		try {
+			const eventObject = Object.freeze({
+				type: message.event.type, detail: message.event.detail ?? null,
+				target: new PpermNode(nodes.get(message.event.targetId ?? record.node.id) ?? record.node, new PermissionGate({ dom: { enabled: true } })),
+				currentTarget: new PpermNode(record.node, new PermissionGate({ dom: { enabled: true } })),
+				bubbles: !!message.event.bubbles, cancelable: !!message.event.cancelable,
+				defaultPrevented: false, preventDefault() {}, stopPropagation() {}, stopImmediatePropagation() {}
+			});
+			if (typeof record.callback === "function") record.callback.call(new PpermNode(record.node, new PermissionGate({ dom: { enabled: true } })), eventObject);
+			else record.callback.handleEvent(eventObject);
+		} catch (error) {
+			emit("error", { error: errorPayload(error) });
+		}
+		if (record.once) listeners.delete(message.listenerId);
+	} else if (message?.type === "shutdown") {
+		stopped = true;
+		close();
+	}
 });
