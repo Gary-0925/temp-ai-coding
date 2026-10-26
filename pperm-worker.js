@@ -14,7 +14,7 @@ function build(data, parent = null) {
 		tagName: data.tagName ?? "#text", idName: data.idName ?? "",
 		className: data.className ?? "", text: data.text ?? "",
 		attributes: { ...(data.attributes ?? {}) }, styleData: { ...(data.styleData ?? {}) },
-		parent, children: [], connected: true
+		parent, children: [], connected: true, eventHandlers: {}
 	};
 	nodes.set(node.id, node);
 	node.children = (data.children ?? []).map(child => build(child, node));
@@ -232,7 +232,16 @@ function wrap(node) {
 			if (p === "addEventListener") return (type, callback, options) => { if (typeof callback !== "function") return; const listenerId = nextId++; listeners.set(listenerId, { node: t, type: String(type), callback, once: !!options?.once }); emit("listen", { id: t.id, listenerId, eventType: String(type), once: !!options?.once }); };
 			if (p === "removeEventListener") return (type, callback) => { for (const [id, l] of listeners) if (l.node === t && l.type === String(type) && l.callback === callback) { listeners.delete(id); emit("unlisten", { id: t.id, listenerId: id, eventType: l.type }); } };
 			if (p === "contains") return other => { let n = raw(other); while (n) { if (n === t) return true; n = n.parent; } return false; };
-			if (p === "click" || p === "focus" || p === "blur") return () => mutate(p, t);
+			if (p === "onclick") return t.eventHandlers.onclick?.callback ?? null;
+			if (p === "click") return () => {
+				const event = Object.freeze({ type: "click", target: wrap(t), currentTarget: wrap(t), detail: null });
+				for (const [id, listener] of [...listeners]) {
+					if (listener.node !== t || listener.type !== "click") continue;
+					listener.callback.call(wrap(t), event);
+					if (listener.once) listeners.delete(id);
+				}
+			};
+			if (p === "focus" || p === "blur") return () => mutate(p, t);
 			if (p === "cloneNode") return deep => {
 				const data = serialize(t);
 				const renew = item => { item.id = nextId++; if (!deep) item.children = []; else item.children.forEach(renew); };
@@ -244,6 +253,21 @@ function wrap(node) {
 			return undefined;
 		},
 		set(t, p, value) {
+			if (p === "onclick") {
+				const previous = t.eventHandlers.onclick;
+				if (previous) {
+					listeners.delete(previous.listenerId);
+					emit("unlisten", { id: t.id, listenerId: previous.listenerId, eventType: "click" });
+					delete t.eventHandlers.onclick;
+				}
+				if (value == null) return true;
+				if (typeof value !== "function") throw new TypeError("onclick must be a function or null");
+				const listenerId = nextId++;
+				listeners.set(listenerId, { node: t, type: "click", callback: value, once: false });
+				t.eventHandlers.onclick = { listenerId, callback: value };
+				emit("listen", { id: t.id, listenerId, eventType: "click", once: false });
+				return true;
+			}
 			if (p === "id") { t.idName = String(value); t.attributes.id = t.idName; mutate("attribute", t, { name: "id", value: t.idName }); }
 			else if (p === "className") { t.className = String(value); t.attributes.class = t.className; mutate("attribute", t, { name: "class", value: t.className }); }
 			else if (p === "textContent" || p === "innerText") {
