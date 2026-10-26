@@ -1168,9 +1168,86 @@ class PpermNode {
 	get setHTMLUnsafe() { this._gate.check("dom"); return () => { this._gate.check("dom"); denied("setHTMLUnsafe"); }; }
 	get setHTML() { this._gate.check("dom"); return () => { this._gate.check("dom"); denied("setHTML"); }; }
 
+	getAttributeNames() {
+		this._gate.check("dom");
+		return Object.keys(this._data.attributes).filter(name => !name.toLowerCase().startsWith("on") && !blockedAttributes.has(name.toLowerCase()));
+	}
+
+	hasAttributes() {
+		this._gate.check("dom");
+		return Object.keys(this._data.attributes).some(name => !name.toLowerCase().startsWith("on") && !blockedAttributes.has(name.toLowerCase()));
+	}
+
+	toggleAttribute(name, force) {
+		this._gate.check("dom");
+		const safeName = String(name).toLowerCase();
+		if (!/^[a-z_:][a-z0-9_.:-]*$/.test(safeName) || safeName.startsWith("on") || blockedAttributes.has(safeName)) denied("attribute " + safeName);
+		const present = Object.hasOwn(this._data.attributes, safeName);
+		const shouldHave = force === undefined ? !present : Boolean(force);
+		if (shouldHave) {
+			if (!present) this.setAttribute(safeName, "");
+		} else if (present) this.removeAttribute(safeName);
+		return shouldHave;
+	}
+
+	getAttributeNS(namespace, localName) {
+		this._gate.check("dom");
+		if (namespace !== null && namespace !== "") throw new DOMException("Namespaced attributes are not supported", "NotSupportedError");
+		return this.getAttribute(localName);
+	}
+
+	setAttributeNS(namespace, qualifiedName, value) {
+		this._gate.check("dom");
+		if (namespace !== null && namespace !== "") throw new DOMException("Namespaced attributes are not supported", "NotSupportedError");
+		if (String(qualifiedName).includes(":")) throw new DOMException("Namespaced attributes are not supported", "NotSupportedError");
+		return this.setAttribute(qualifiedName, value);
+	}
+
+	removeAttributeNS(namespace, localName) {
+		this._gate.check("dom");
+		if (namespace !== null && namespace !== "") throw new DOMException("Namespaced attributes are not supported", "NotSupportedError");
+		return this.removeAttribute(localName);
+	}
+
+	insertAdjacentText(position, text) {
+		this._gate.check("dom");
+		const value = String(text);
+		const where = String(position).toLowerCase();
+		const node = new PpermNode(makeData({ nodeType: 3, tagName: "#text", text: value, connected: false }), this._gate);
+		if (where === "beforebegin") {
+			if (!this._data.parent) throw new DOMException("The element has no parent", "NoModificationAllowedError");
+			new PpermNode(this._data.parent, this._gate).insertBefore(node, this);
+		} else if (where === "afterend") {
+			if (!this._data.parent) throw new DOMException("The element has no parent", "NoModificationAllowedError");
+			const siblings = this._data.parent.children;
+			const index = siblings.indexOf(this._data);
+			new PpermNode(this._data.parent, this._gate).insertBefore(node, siblings[index + 1] ? new PpermNode(siblings[index + 1], this._gate) : null);
+		} else if (where === "afterbegin") this.prepend(value);
+		else if (where === "beforeend") this.append(value);
+		else throw new DOMException("Invalid position", "SyntaxError");
+		return node;
+	}
+
+	insertAdjacentElement(position, element) {
+		this._gate.check("dom");
+		if (!(element instanceof PpermNode)) throw new TypeError("Expected a pperm Node");
+		const where = String(position).toLowerCase();
+		if (where === "afterbegin") { this.prepend(element); return element; }
+		if (where === "beforeend") { this.appendChild(element); return element; }
+		if (!this._data.parent) throw new DOMException("The element has no parent", "NoModificationAllowedError");
+		const siblings = this._data.parent.children;
+		const index = siblings.indexOf(this._data);
+		const parent = new PpermNode(this._data.parent, this._gate);
+		if (where === "beforebegin") { parent.insertBefore(element, this); return element; }
+		if (where === "afterend") { parent.insertBefore(element, siblings[index + 1] ? new PpermNode(siblings[index + 1], this._gate) : null); return element; }
+		throw new DOMException("Invalid position", "SyntaxError");
+	}
+
 	getAttribute(name) {
 		this._gate.check("dom");
-		return this._data.attributes[String(name).toLowerCase()] ?? null;
+		const safeName = String(name).toLowerCase();
+		if (safeName.startsWith("on") || blockedAttributes.has(safeName)) denied("attribute " + safeName);
+		return this._data.attributes[safeName] ?? null;
 	}
 
 	hasAttribute(name) {
