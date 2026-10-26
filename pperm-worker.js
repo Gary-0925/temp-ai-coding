@@ -95,7 +95,7 @@ function serialize(data) {
 	return {
 		id: data.id, nodeType: data.nodeType, tagName: data.tagName, idName: data.idName,
 		className: data.className, text: data.text, attributes: { ...data.attributes },
-		styleData: { ...data.styleData }, value: data.value, checked: data.checked, disabled: data.disabled,
+		styleData: { ...data.styleData }, value: data.value, checked: data.checked, disabled: data.disabled, muted: data.muted,
 		selected: data.selected, indeterminate: data.indeterminate, tabIndex: data.tabIndex, width: data.width,
 		height: data.height, rows: data.rows, cols: data.cols, maxLength: data.maxLength, minLength: data.minLength,
 		rowSpan: data.rowSpan, colSpan: data.colSpan, size: data.size, start: data.start, span: data.span,
@@ -109,7 +109,7 @@ function makeData(input = {}, parent = null) {
 		tagName: input.tagName ?? "#text", idName: input.idName ?? "",
 		className: input.className ?? "", text: input.text ?? "",
 		attributes: { ...(input.attributes ?? {}) }, styleData: { ...(input.styleData ?? {}) },
-		value: input.value, checked: input.checked, disabled: input.disabled, selected: input.selected,
+		value: input.value, checked: input.checked, disabled: input.disabled, muted: input.muted, selected: input.selected,
 		indeterminate: input.indeterminate, tabIndex: input.tabIndex, width: input.width, height: input.height,
 		rows: input.rows, cols: input.cols, maxLength: input.maxLength, minLength: input.minLength,
 		rowSpan: input.rowSpan, colSpan: input.colSpan, size: input.size, start: input.start, span: input.span,
@@ -358,7 +358,7 @@ const ordinaryAttributeProperties = new Map([
 	["autofocus", { attribute: "autofocus", kind: "boolean" }],
 	["controls", { attribute: "controls", kind: "boolean" }],
 	["loop", { attribute: "loop", kind: "boolean" }],
-	["muted", { attribute: "muted", kind: "boolean" }],
+	["muted", { attribute: "muted", kind: "stateBoolean" }],
 	["open", { attribute: "open", kind: "boolean" }],
 	["reversed", { attribute: "reversed", kind: "boolean" }],
 	["noValidate", { attribute: "novalidate", kind: "boolean" }],
@@ -391,6 +391,7 @@ class PpermNode {
 					const { attribute, kind, field } = ordinaryAttributeProperties.get(property);
 					if (field) return target.#data[field];
 					if (kind === "boolean") return Object.hasOwn(target.#data.attributes, attribute);
+					if (kind === "stateBoolean") return target.#data.muted ?? Object.hasOwn(target.#data.attributes, attribute);
 					return target.#data.attributes[attribute] ?? "";
 				}
 				if (typeof property === "string" && eventPropertyNames.has(property)) {
@@ -410,12 +411,13 @@ class PpermNode {
 					target.#gate.check("dom");
 					const { attribute, kind, field } = ordinaryAttributeProperties.get(property);
 					let next = value;
-					if (kind === "boolean") { next = Boolean(value); safeAttribute(attribute, ""); }
+					if (kind === "boolean" || kind === "stateBoolean") { next = Boolean(value); safeAttribute(attribute, ""); }
 					else { next = String(value); safeAttribute(attribute, next); }
 					if (kind === "boolean") {
 						if (next) target.#data.attributes[attribute] = "";
 						else delete target.#data.attributes[attribute];
-					} else target.#data.attributes[attribute] = next;
+					} else if (kind === "stateBoolean") target.#data.muted = next;
+					else target.#data.attributes[attribute] = next;
 					if (field) target.#data[field] = next;
 					emitMutation(target.#data, "reflectedProperty", { property, attribute, value: next, kind });
 					return true;
