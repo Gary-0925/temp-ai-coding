@@ -60,7 +60,7 @@ Currently supported selectors are simple tag names, `#id`, and `.class`. The bri
 
 The DOM bridge rejects inline event-handler attributes and properties such as `onclick`, `onerror`, and `onload`; executable HTML sinks such as `innerHTML` and `outerHTML`; dangerous URL schemes; resource-loading CSS; and active element types such as `script`, `iframe`, and custom elements. The main thread repeats these checks rather than trusting Worker messages, since code running in a Worker can call its global `postMessage` directly.
 
-Use `addEventListener()` for supported event callbacks. This does not make the library a hardened sandbox: scripts can still use browser capabilities exposed by the Worker, and interacting with an existing page can trigger that page's own event handlers or application behavior. Only enable DOM access for a dedicated, low-trust container, not a privileged application UI.
+Use `addEventListener()` for supported event callbacks. This does not make the library a hardened sandbox: scripts can still use browser capabilities exposed by the Worker, DOM resource URLs may initiate network requests independently of the `fetch` wrapper, and interacting with an existing page can trigger that page's own event handlers or application behavior. Only enable DOM access for a dedicated, low-trust container, not a privileged application UI.
 
 ## Execution and security
 
