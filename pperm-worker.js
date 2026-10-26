@@ -526,19 +526,56 @@ class PpermNode {
 	get childElementCount() { this.#gate.check("dom"); return this.#data.children.filter(child => child.nodeType === 1).length; }
 	get dataset() {
 		this.#gate.check("dom");
-		const result = {};
-		for (const [name] of Object.entries(this.#data.attributes)) {
-			if (!name.startsWith("data-") || name.length <= 5) continue;
-			const key = name.slice(5).replace(/-([a-z])/g, (_, character) => character.toUpperCase());
-			if (!/^[a-zA-Z][a-zA-Z0-9]*$/.test(key)) continue;
-			const node = this;
-			Object.defineProperty(result, key, {
-				enumerable: true,
-					get() { node.#gate.check("dom"); return node.#data.attributes[name]; },
-					set(value) { node.#gate.check("dom"); node.setAttribute(name, value); }
-			});
-		}
-		return Object.preventExtensions(result);
+		const node = this;
+		const attributeName = key => {
+			if (typeof key !== "string" || !key || ["__proto__", "prototype", "constructor"].includes(key)) return null;
+			if (/-[a-z]/.test(key)) throw new DOMException("Invalid dataset property name", "SyntaxError");
+			return "data-" + key.replace(/[A-Z]/g, character => "-" + character.toLowerCase());
+		};
+		const propertyName = name => name.slice(5).replace(/-([a-z])/g, (_, character) => character.toUpperCase());
+		return new Proxy({}, {
+			get(_target, property) {
+				if (typeof property !== "string") return undefined;
+				node.#gate.check("dom");
+				const name = attributeName(property);
+				return name ? node.#data.attributes[name] : undefined;
+			},
+			set(_target, property, value) {
+				if (typeof property !== "string") return false;
+				node.#gate.check("dom");
+				const name = attributeName(property);
+				if (!name) denied("dataset property");
+				node.setAttribute(name, String(value));
+				return true;
+			},
+			deleteProperty(_target, property) {
+				if (typeof property !== "string") return true;
+				node.#gate.check("dom");
+				const name = attributeName(property);
+				if (!name) denied("dataset property");
+				if (Object.hasOwn(node.#data.attributes, name)) node.removeAttribute(name);
+				return true;
+			},
+			has(_target, property) {
+				if (typeof property !== "string") return false;
+				node.#gate.check("dom");
+				const name = attributeName(property);
+				return !!name && Object.hasOwn(node.#data.attributes, name);
+			},
+			ownKeys() {
+				node.#gate.check("dom");
+				return Object.keys(node.#data.attributes)
+					.filter(name => name.startsWith("data-") && name.length > 5)
+					.map(propertyName);
+			},
+			getOwnPropertyDescriptor(_target, property) {
+				if (typeof property !== "string") return undefined;
+				node.#gate.check("dom");
+				const name = attributeName(property);
+				if (!name || !Object.hasOwn(node.#data.attributes, name)) return undefined;
+				return { configurable: true, enumerable: true, writable: true, value: node.#data.attributes[name] };
+			}
+		});
 	}
 	get nodeValue() { this.#gate.check("dom"); return this.#data.nodeType===3||this.#data.nodeType===8?this.#data.text:null; }
 	set nodeValue(value) { this.#gate.check("dom"); if(this.#data.nodeType===3||this.#data.nodeType===8){this.#data.text=value==null?"":String(value);emitMutation(this.#data,"text",{value:this.#data.text});} }
