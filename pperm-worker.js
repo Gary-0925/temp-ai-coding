@@ -1002,6 +1002,58 @@ class PpermNode {
 		return order.indexOf(this.#data) < order.indexOf(candidate) ? 4 : 2;
 	}
 
+	normalize() {
+		this.#gate.check("dom");
+		const visit = parent => {
+			let previousText = null;
+			for (let index = 0; index < parent.children.length;) {
+				const child = parent.children[index];
+				if (child.nodeType === 3) {
+					if (child.text === "") {
+						parent.children.splice(index, 1);
+						child.parent = null;
+						setConnected(child, false);
+						emitMutation(parent, "remove", { childId: child.id });
+						continue;
+					}
+					if (previousText) {
+						previousText.text += child.text;
+						emitMutation(previousText, "text", { value: previousText.text });
+						parent.children.splice(index, 1);
+						child.parent = null;
+						setConnected(child, false);
+						emitMutation(parent, "remove", { childId: child.id });
+						continue;
+					}
+					previousText = child;
+				} else {
+					previousText = null;
+					visit(child);
+				}
+				index++;
+			}
+		};
+		visit(this.#data);
+	}
+
+	getClientRects() {
+		this.#gate.check("dom");
+		throw new DOMException("Layout measurements are asynchronous across the Worker bridge and are not supported yet", "NotSupportedError");
+	}
+
+	scrollIntoView() {
+		this.#gate.check("dom");
+		throw new DOMException("Scrolling is not exposed by the DOM bridge", "NotSupportedError");
+	}
+
+	attachShadow() {
+		this.#gate.check("dom");
+		denied("attachShadow");
+	}
+
+	get shadowRoot() { this.#gate.check("dom"); return null; }
+	get assignedSlot() { this.#gate.check("dom"); return null; }
+
 	hasChildNodes() { this.#gate.check("dom"); return this.#data.children.length>0; }
 	get href() { this.#gate.check("dom"); return this.#data.attributes.href??""; }
 	set href(value) { this.#gate.check("dom"); const text=String(value);safeAttribute("href",text);this.#data.attributes.href=text;emitMutation(this.#data,"attribute",{name:"href",value:text}); }
