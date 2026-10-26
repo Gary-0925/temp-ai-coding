@@ -286,14 +286,21 @@ class PpermNode {
 
 	_getProperty(property) {
 		this._gate.check("dom");
-		return this._getIdentityProperty(property)
-			?? this._getTreeProperty(property)
-			?? this._getQueryMethod(property)
-			?? this._getMutationMethod(property)
-			?? this._getEventMethod(property)
-			?? this._getAttributeProperty(property)
-			?? this._getBlockedProperty(property)
-			?? this._getFallbackProperty(property);
+		const readers = [
+			this._getIdentityProperty,
+			this._getTreeProperty,
+			this._getQueryMethod,
+			this._getMutationMethod,
+			this._getEventMethod,
+			this._getAttributeProperty,
+			this._getBlockedProperty,
+			this._getFallbackProperty
+		];
+		for (const read of readers) {
+			const value = read.call(this, property);
+			if (value !== undefined) return value;
+		}
+		return undefined;
 	}
 
 	_getIdentityProperty(property) {
