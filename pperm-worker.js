@@ -169,6 +169,7 @@ self.addEventListener("message", event => {
 	const m = event.data;
 	if (m?.type === "init") {
 		root = build(m.snapshot);
+		nextId = Math.max(nextId, ...Array.from(nodes.keys(), id => Number(id) + 1));
 		const deny = name => new Proxy(function() { throw new DOMException(name + " is not permitted", "NotAllowedError"); }, { construct() { throw new DOMException(name + " is not permitted", "NotAllowedError"); } });
 		const allowed = m.permissions;
 		const guard = (ok, name, value) => ok ? value : deny(name);
