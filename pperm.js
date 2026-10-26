@@ -436,7 +436,13 @@ export class PpermProcess extends EventTarget {
 			this.#worker.postMessage({
 				type: "event",
 				listenerId: message.listenerId,
-				event: { type: nativeEvent.type, detail: nativeEvent.detail ?? null }
+				event: {
+					type: nativeEvent.type,
+					detail: nativeEvent.detail ?? null,
+					targetId: this.#findNodeId(nativeEvent.target),
+					bubbles: !!nativeEvent.bubbles,
+					cancelable: !!nativeEvent.cancelable
+				}
 			});
 		};
 		target.addEventListener(message.eventType, handler, { once: !!message.once });
