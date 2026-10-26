@@ -80,7 +80,10 @@ function snapshotNode(node, ids, state) {
 	ids.set(id, node);
 	const attributes = {};
 	if (node.nodeType === 1) {
-		for (const attr of node.attributes) attributes[attr.name] = attr.value;
+		for (const attr of node.attributes) {
+			const name = attr.name.toLowerCase();
+			if (!name.startsWith("on") && !["srcdoc", "nonce", "integrity", "is", "action", "formaction"].includes(name)) attributes[attr.name] = attr.value;
+		}
 	}
 	const styleData = {};
 	if (node.nodeType === 1) {
@@ -337,7 +340,7 @@ export class PpermProcess extends EventTarget {
 					snapshot = { id: 1, nodeType: 1, tagName: "BODY", idName: "", className: "", text: "", attributes: {}, styleData: {}, children: [] };
 					this.#nodeIds = new Map();
 				}
-				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-18", import.meta.url));
+				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-19", import.meta.url));
 				this.#worker.addEventListener("message", event => {
 					if (settled || this.#terminated) return;
 					const message = event.data;
