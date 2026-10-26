@@ -730,8 +730,8 @@ class PpermNode {
 		if (shouldHave === present) return shouldHave;
 		if (shouldHave) this.#data.attributes[safeName] = "";
 		else delete this.#data.attributes[safeName];
-		if (safeName === "id") this.#data.idName = shouldHave ? "" : "";
-		if (safeName === "class") this.#data.className = shouldHave ? "" : "";
+		if (safeName === "id") this.#data.idName = "";
+		if (safeName === "class") this.#data.className = "";
 		emitMutation(this.#data, "toggleAttribute", { name: safeName, force: shouldHave });
 		return shouldHave;
 	}
