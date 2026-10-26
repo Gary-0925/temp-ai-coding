@@ -125,6 +125,9 @@ class PpermStyle {
 		Object.preventExtensions(this);
 	}
 
+	get cssFloat() { this.#gate.check("dom"); return this.#owner.styleData.float ?? ""; }
+	set cssFloat(value) { this.#gate.check("dom"); const text = String(value); safeStyle("float", text); this.#owner.styleData.float = text; emitMutation(this.#owner, "style", { property: "float", value: text }); }
+
 	get cssText() {
 		this.#gate.check("dom");
 		return Object.entries(this.#owner.styleData).map(([name, value]) => name.replace(/[A-Z]/g, c => "-" + c.toLowerCase()) + ": " + value + ";").join(" ");
@@ -773,6 +776,7 @@ class PpermStyle {
 	get writingMode() { this.#gate.check("dom"); return this.#owner.styleData.writingMode ?? ""; }
 	set writingMode(value) { this.#gate.check("dom"); const text = String(value); safeStyle("writingMode", text); this.#owner.styleData.writingMode = text; emitMutation(this.#owner, "style", { property: "writingMode", value: text }); }
 	get zIndex() { this.#gate.check("dom"); return this.#owner.styleData.zIndex ?? ""; }
+	[Symbol.iterator]() { this.#gate.check("dom"); return Object.keys(this.#owner.styleData)[Symbol.iterator](); }
 	set zIndex(value) { this.#gate.check("dom"); const text = String(value); safeStyle("zIndex", text); this.#owner.styleData.zIndex = text; emitMutation(this.#owner, "style", { property: "zIndex", value: text }); }
 }
 class PpermTokenList {
@@ -794,6 +798,39 @@ class PpermTokenList {
 		this.#owner.className = [...new Set(values)].join(" ");
 		this.#owner.attributes.class = this.#owner.className;
 		emitMutation(this.#owner, "attribute", { name: "class", value: this.#owner.className });
+	}
+
+	get length() { this.#gate.check("dom"); return this._values().length; }
+
+	item(index) {
+		this.#gate.check("dom");
+		return this._values()[Number(index)] ?? null;
+	}
+
+	entries() {
+		this.#gate.check("dom");
+		return this._values().entries();
+	}
+
+	keys() {
+		this.#gate.check("dom");
+		return this._values().keys();
+	}
+
+	values() {
+		this.#gate.check("dom");
+		return this._values().values();
+	}
+
+	forEach(callback, thisArg) {
+		this.#gate.check("dom");
+		if (typeof callback !== "function") throw new TypeError("Callback must be a function");
+		this._values().forEach((value, index, values) => callback.call(thisArg, value, value, this));
+	}
+
+	toString() {
+		this.#gate.check("dom");
+		return this.#owner.className;
 	}
 
 	contains(value) {
