@@ -65,3 +65,10 @@ This does not make the library a hardened sandbox: scripts can still use browser
 ## Execution and security
 
 A dedicated Worker lets the main thread's timeout terminate a script even when the script is stuck in a synchronous infinite loop. This protects the page's main thread from user-code CPU loops, though it cannot guarantee that browser internals, expensive DOM mutations, or other browser processes never stall. Workers do not provide a hardened security sandbox: hostile code may still access Worker globals and bypass some API permission wrappers. Do not treat this library as a secure environment for arbitrary malicious code.
+
+
+## DOM bridge architecture
+
+The Worker DOM surface is organized as explicit classes: `PermissionGate`, `PpermDocument`, `PpermNode`, `PpermStyle`, and `PpermTokenList`. Public DOM methods check the DOM capability at entry, then implement their operation directly. The main-thread bridge independently checks the permission again before applying a mutation.
+
+This is a Worker-backed DOM model, not a synchronous native DOM implementation. Core tree operations, basic selectors, attributes, styles, and event listeners are implemented; unsupported browser APIs throw `NotSupportedError` rather than pretending to be native. Programmatic `click()` is routed through the Worker event bridge and does not call the host page's native `click()`.
