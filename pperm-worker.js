@@ -661,6 +661,155 @@ class PpermDocument {
 				if (typeof property === "symbol") return Reflect.get(target, property, target);
 				const name = String(property);
 				if (name.startsWith("_") || ["constructor", "__proto__", "prototype"].includes(name)) denied(name);
+				if (!(property in target)) denied(name);
+				const value = Reflect.get(target, property, target);
+				return typeof value === "function" ? value.bind(target) : value;
+			},
+			set: (target, property, value) => {
+				target._gate.check("dom");
+				if (String(property).startsWith("_") || ["constructor", "__proto__", "prototype"].includes(String(property))) denied(String(property));
+				const descriptor = Reflect.getOwnPropertyDescriptor(target, property);
+				if (descriptor?.set || descriptor?.writable) return Reflect.set(target, property, value, target);
+				denied(String(property));
+			}
+		});
+	}
+
+	get body() { this._gate.check("dom"); return new PpermNode(root, this._gate); }
+	get documentElement() { this._gate.check("dom"); return new PpermNode(root, this._gate); }
+	get nodeType() { this._gate.check("dom"); return 9; }
+	get nodeName() { this._gate.check("dom"); return "#document"; }
+	get title() { this._gate.check("dom"); return ""; }
+	set title(value) { this._gate.check("dom"); emit("documentTitle", { value: String(value) }); }
+	get documentURI() { this._gate.check("dom"); return ""; }
+	get URL() { this._gate.check("dom"); return ""; }
+	get baseURI() { this._gate.check("dom"); return ""; }
+	get compatMode() { this._gate.check("dom"); return "CSS1Compat"; }
+	get characterSet() { this._gate.check("dom"); return "UTF-8"; }
+	get contentType() { this._gate.check("dom"); return "text/html"; }
+	get readyState() { this._gate.check("dom"); return "complete"; }
+	get defaultView() { this._gate.check("dom"); return null; }
+	get activeElement() { this._gate.check("dom"); return null; }
+	get head() { this._gate.check("dom"); return null; }
+	get forms() { this._gate.check("dom"); return []; }
+	get images() { this._gate.check("dom"); return []; }
+	get links() { this._gate.check("dom"); return []; }
+	get scripts() { this._gate.check("dom"); return []; }
+	get children() { this._gate.check("dom"); return [new PpermNode(root, this._gate)]; }
+	get childNodes() { this._gate.check("dom"); return [new PpermNode(root, this._gate)]; }
+	get firstChild() { this._gate.check("dom"); return new PpermNode(root, this._gate); }
+	get lastChild() { this._gate.check("dom"); return new PpermNode(root, this._gate); }
+	get implementation() { this._gate.check("dom"); return Object.freeze({ hasFeature: () => { this._gate.check("dom"); return false; } }); }
+
+	getElementById(id) {
+		this._gate.check("dom");
+		return this.querySelector("#" + String(id));
+	}
+
+	getElementsByClassName(name) {
+		this._gate.check("dom");
+		const classes = String(name).trim().split(/\\s+/).filter(Boolean);
+		if (!classes.length) return [];
+		return this.querySelectorAll(classes.map(value => "." + value).join(""));
+	}
+
+	getElementsByTagName(name) {
+		this._gate.check("dom");
+		const value = String(name);
+		if (value === "*") {
+			const out = [];
+			const walk = data => { if (data.nodeType === 1) out.push(new PpermNode(data, this._gate)); data.children.forEach(walk); };
+			walk(root);
+			return out;
+		}
+		return this.querySelectorAll(value);
+	}
+
+	querySelector(selector) {
+		this._gate.check("dom");
+		return this.querySelectorAll(selector)[0] ?? null;
+	}
+
+	querySelectorAll(selector) {
+		this._gate.check("dom");
+		const out = [];
+		const walk = data => {
+			if (selectorMatches(data, selector)) out.push(new PpermNode(data, this._gate));
+			data.children.forEach(walk);
+		};
+		walk(root);
+		return out;
+	}
+
+	createElement(tagName, options) {
+		this._gate.check("dom");
+		if (options != null) throw new DOMException("Customized built-in elements are not supported", "NotSupportedError");
+		const tag = safeElementName(tagName);
+		return new PpermNode(makeData({ tagName: tag.toUpperCase(), connected: false }), this._gate);
+	}
+
+	createElementNS(namespace, qualifiedName) {
+		this._gate.check("dom");
+		if (namespace !== null && namespace !== "http://www.w3.org/1999/xhtml") denied("createElementNS namespace");
+		return this.createElement(qualifiedName);
+	}
+
+	createTextNode(text) {
+		this._gate.check("dom");
+		return new PpermNode(makeData({ nodeType: 3, tagName: "#text", text: String(text), connected: false }), this._gate);
+	}
+
+	createComment(text) {
+		this._gate.check("dom");
+		return new PpermNode(makeData({ nodeType: 8, tagName: "#comment", text: String(text), connected: false }), this._gate);
+	}
+
+	createDocumentFragment() {
+		this._gate.check("dom");
+		return new PpermNode(makeData({ nodeType: 11, tagName: "#fragment", connected: false }), this._gate);
+	}
+
+	createEvent() {
+		this._gate.check("dom");
+		throw new DOMException("Use dispatchEvent with an Event-like object", "NotSupportedError");
+	}
+
+	addEventListener(type, callback, options) {
+		this._gate.check("dom");
+		return new PpermNode(root, this._gate).addEventListener(type, callback, options);
+	}
+
+	removeEventListener(type, callback, options) {
+		this._gate.check("dom");
+		return new PpermNode(root, this._gate).removeEventListener(type, callback, options);
+	}
+
+	importNode(node, deep = false) {
+		this._gate.check("dom");
+		if (!(node instanceof PpermNode)) throw new TypeError("Expected a pperm Node");
+		return node.cloneNode(deep);
+	}
+
+	adoptNode(node) {
+		this._gate.check("dom");
+		if (!(node instanceof PpermNode)) throw new TypeError("Expected a pperm Node");
+		if (raw(node) === root) denied("adopting the permitted root");
+		if (raw(node).parent) new PpermNode(raw(node).parent, this._gate).removeChild(node);
+		return node;
+	}
+
+	getElementsByName(name) {
+		this._gate.check("dom");
+		const value = String(name);
+		return this.querySelectorAll('[name="' + value.replace(/["\\\\]/g, "\\\\class PpermDocument {
+	constructor(gate) {
+		this._gate = gate;
+		return new Proxy(this, {
+			get: (target, property) => {
+				target._gate.check("dom");
+				if (typeof property === "symbol") return Reflect.get(target, property, target);
+				const name = String(property);
+				if (name.startsWith("_") || ["constructor", "__proto__", "prototype"].includes(name)) denied(name);
 				if (property in target) {
 					const value = Reflect.get(target, property, target);
 					return typeof value === "function" ? value.bind(target) : value;
@@ -736,7 +885,9 @@ class PpermDocument {
 		return new PpermNode(makeData({ nodeType: 11, tagName: "#fragment", connected: false }), this._gate);
 	}
 }
-
+") + '"]');
+	}
+}
 function errorPayload(error) {
 	return { name: error?.name ?? "Error", message: error?.message ?? String(error), stack: error?.stack };
 }
