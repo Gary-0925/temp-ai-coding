@@ -28,10 +28,11 @@ const blockedElementNames = new Set([
 ]);
 const blockedAttributeNames = new Set(["srcdoc", "nonce", "integrity", "is", "formaction", "action"]);
 const urlAttributeNames = new Set(["href", "src", "action", "formaction", "poster", "cite", "xlink:href", "background", "data", "manifest"]);
-const safePropertyNames = new Set([
-	"value", "checked", "disabled", "title", "hidden", "name", "type",
-	"href", "src", "alt", "tabIndex", "role", "draggable", "contentEditable"
+const blockedPropertyNames = new Set([
+	"innerHTML", "outerHTML", "srcdoc", "insertAdjacentHTML", "setHTMLUnsafe",
+	"setHTML", "outerText", "innerText"
 ]);
+const urlPropertyNames = new Set(["href", "src", "action", "formAction", "poster", "cite", "background", "data", "manifest"]);
 
 function assertSafeElementName(value) {
 	const name = String(value).toLowerCase();
@@ -57,10 +58,13 @@ function assertSafeAttribute(name, value) {
 
 function assertSafeProperty(name, value) {
 	name = String(name);
-	if (name.startsWith("on") || ["innerHTML", "outerHTML", "srcdoc", "insertAdjacentHTML", "setHTMLUnsafe", "setHTML"].includes(name)) {
-		throw new DOMException("Executable DOM property is not permitted by the bridge: " + name, "NotAllowedError");
+	if (blockedPropertyNames.has(name) || name.startsWith("__")) {
+		throw new DOMException("DOM property is not permitted by the bridge: " + name, "NotAllowedError");
 	}
-	if (safePropertyNames.has(name) && (name === "href" || name === "src")) assertSafeAttribute(name, value);
+	if (/^on[a-z]+$/i.test(name)) {
+		throw new DOMException("Use a function callback for event-handler properties", "NotAllowedError");
+	}
+	if (urlPropertyNames.has(name)) assertSafeAttribute(name.toLowerCase(), value);
 	return name;
 }
 
@@ -232,7 +236,7 @@ function wrap(node) {
 			if (p === "addEventListener") return (type, callback, options) => { if (typeof callback !== "function") return; const listenerId = nextId++; listeners.set(listenerId, { node: t, type: String(type), callback, once: !!options?.once }); emit("listen", { id: t.id, listenerId, eventType: String(type), once: !!options?.once }); };
 			if (p === "removeEventListener") return (type, callback) => { for (const [id, l] of listeners) if (l.node === t && l.type === String(type) && l.callback === callback) { listeners.delete(id); emit("unlisten", { id: t.id, listenerId: id, eventType: l.type }); } };
 			if (p === "contains") return other => { let n = raw(other); while (n) { if (n === t) return true; n = n.parent; } return false; };
-			if (p === "onclick") return t.eventHandlers.onclick?.callback ?? null;
+			if (/^on[a-z]+$/i.test(String(p))) return t.eventHandlers[p]?.callback ?? null;
 			if (p === "click") return () => {
 				const event = Object.freeze({ type: "click", target: wrap(t), currentTarget: wrap(t), detail: null });
 				for (const [id, listener] of [...listeners]) {
@@ -253,19 +257,21 @@ function wrap(node) {
 			return undefined;
 		},
 		set(t, p, value) {
-			if (p === "onclick") {
-				const previous = t.eventHandlers.onclick;
+			if (/^on[a-z]+$/i.test(String(p))) {
+				const property = String(p);
+				const previous = t.eventHandlers[property];
 				if (previous) {
 					listeners.delete(previous.listenerId);
-					emit("unlisten", { id: t.id, listenerId: previous.listenerId, eventType: "click" });
-					delete t.eventHandlers.onclick;
+					emit("unlisten", { id: t.id, listenerId: previous.listenerId, eventType: property.slice(2) });
+					delete t.eventHandlers[property];
 				}
 				if (value == null) return true;
-				if (typeof value !== "function") throw new TypeError("onclick must be a function or null");
+				if (typeof value !== "function") throw new TypeError(property + " must be a function or null");
+				const eventType = property.slice(2).toLowerCase();
 				const listenerId = nextId++;
-				listeners.set(listenerId, { node: t, type: "click", callback: value, once: false });
-				t.eventHandlers.onclick = { listenerId, callback: value };
-				emit("listen", { id: t.id, listenerId, eventType: "click", once: false });
+				listeners.set(listenerId, { node: t, type: eventType, callback: value, once: false });
+				t.eventHandlers[property] = { listenerId, callback: value };
+				emit("listen", { id: t.id, listenerId, eventType, once: false });
 				return true;
 			}
 			if (p === "id") { t.idName = String(value); t.attributes.id = t.idName; mutate("attribute", t, { name: "id", value: t.idName }); }
@@ -284,11 +290,11 @@ function wrap(node) {
 			else if (p === "innerHTML") throw new DOMException("innerHTML is not supported; use textContent or createElement", "NotSupportedError");
 			else {
 				const property = assertSafeProperty(p, value);
-				if (safePropertyNames.has(property)) {
-					t[property] = value;
-					t.attributes[property.toLowerCase()] = String(value);
-					mutate("property", t, { property, value });
-				} else t[property] = value;
+				if (typeof value === "function" || (value !== null && typeof value === "object")) {
+					throw new TypeError("DOM properties bridged to the main thread must use serializable primitive values");
+				}
+				t[property] = value;
+				mutate("property", t, { property, value });
 			}
 			return true;
 		}
