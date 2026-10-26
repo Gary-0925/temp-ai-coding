@@ -910,6 +910,27 @@ class PpermNode {
 	get tagName() { this.#gate.check("dom"); return this.#data.tagName; }
 	get nodeName() { this.#gate.check("dom"); return this.#data.tagName; }
 	get nodeType() { this.#gate.check("dom"); return this.#data.nodeType; }
+	get localName() { this.#gate.check("dom"); return this.#data.nodeType === 1 ? this.#data.tagName.toLowerCase() : null; }
+	get namespaceURI() { this.#gate.check("dom"); return this.#data.nodeType === 1 ? "http://www.w3.org/1999/xhtml" : null; }
+	get prefix() { this.#gate.check("dom"); return null; }
+	get baseURI() { this.#gate.check("dom"); return documentProxy?.baseURI ?? ""; }
+	get childElementCount() { this.#gate.check("dom"); return this.#data.children.filter(child => child.nodeType === 1).length; }
+	get dataset() {
+		this.#gate.check("dom");
+		const result = {};
+		for (const [name] of Object.entries(this.#data.attributes)) {
+			if (!name.startsWith("data-") || name.length <= 5) continue;
+			const key = name.slice(5).replace(/-([a-z])/g, (_, character) => character.toUpperCase());
+			if (!/^[a-zA-Z][a-zA-Z0-9]*$/.test(key)) continue;
+			const node = this;
+			Object.defineProperty(result, key, {
+				enumerable: true,
+					get() { node.#gate.check("dom"); return node.#data.attributes[name]; },
+					set(value) { node.#gate.check("dom"); node.setAttribute(name, value); }
+			});
+		}
+		return Object.preventExtensions(result);
+	}
 	get nodeValue() { this.#gate.check("dom"); return this.#data.nodeType===3||this.#data.nodeType===8?this.#data.text:null; }
 	set nodeValue(value) { this.#gate.check("dom"); if(this.#data.nodeType===3||this.#data.nodeType===8){this.#data.text=value==null?"":String(value);emitMutation(this.#data,"text",{value:this.#data.text});} }
 	get data() { this.#gate.check("dom"); return this.#data.nodeType===3||this.#data.nodeType===8?this.#data.text:null; }
@@ -923,7 +944,7 @@ class PpermNode {
 	get isConnected() { this.#gate.check("dom"); return this.#data.connected; }
 	get ownerDocument() { this.#gate.check("dom"); return documentProxy; }
 	get attributes() { this.#gate.check("dom"); return Object.entries(this.#data.attributes).filter(([name]) => !name.toLowerCase().startsWith("on") && !blockedAttributes.has(name.toLowerCase())).map(([name,value])=>({name,value})); }
-	get parentNode() { this.#gate.check("dom"); return this.#data.parent?new PpermNode(this.#data.parent,this.#gate):null; }
+	get parentNode() { this.#gate.check("dom"); if (this.#data === root) return documentProxy; return this.#data.parent ? new PpermNode(this.#data.parent, this.#gate) : null; }
 	get parentElement() { this.#gate.check("dom"); return this.#data.parent?.nodeType===1?new PpermNode(this.#data.parent,this.#gate):null; }
 	get children() { this.#gate.check("dom"); return this.#data.children.filter(c=>c.nodeType===1).map(c=>new PpermNode(c,this.#gate)); }
 	get childNodes() { this.#gate.check("dom"); return this.#data.children.map(c=>new PpermNode(c,this.#gate)); }
@@ -937,6 +958,7 @@ class PpermNode {
 	get previousElementSibling() { this.#gate.check("dom"); if(!this.#data.parent)return null;const a=this.#data.parent.children.filter(c=>c.nodeType===1),i=a.indexOf(this.#data);return i>0?new PpermNode(a[i-1],this.#gate):null; }
 	getRootNode(options = {}) {
 		this.#gate.check("dom");
+		if (this.#data.connected) return documentProxy;
 		let node = this.#data;
 		while (node.parent) node = node.parent;
 		return new PpermNode(node, this.#gate);
@@ -1532,9 +1554,10 @@ class PpermDocument {
 	get defaultView() { this.#gate.check("dom"); return null; }
 	get activeElement() { this.#gate.check("dom"); return null; }
 	get head() { this.#gate.check("dom"); return null; }
-	get forms() { this.#gate.check("dom"); return []; }
-	get images() { this.#gate.check("dom"); return []; }
-	get links() { this.#gate.check("dom"); return []; }
+	get doctype() { this.#gate.check("dom"); return null; }
+	get forms() { this.#gate.check("dom"); return this.getElementsByTagName("form"); }
+	get images() { this.#gate.check("dom"); return this.getElementsByTagName("img"); }
+	get links() { this.#gate.check("dom"); return [...this.getElementsByTagName("a"), ...this.getElementsByTagName("area")]; }
 	get scripts() { this.#gate.check("dom"); return []; }
 	get children() { this.#gate.check("dom"); return [new PpermNode(root, this.#gate)]; }
 	get childNodes() { this.#gate.check("dom"); return [new PpermNode(root, this.#gate)]; }
@@ -1643,6 +1666,12 @@ class PpermDocument {
 		if (raw(node) === root) denied("adopting the permitted root");
 		if (raw(node).parent) new PpermNode(raw(node).parent, this.#gate).removeChild(node);
 		return node;
+	}
+
+	getElementsByTagNameNS(namespace, localName) {
+		this.#gate.check("dom");
+		if (namespace !== null && namespace !== "*" && namespace !== "http://www.w3.org/1999/xhtml") return [];
+		return this.getElementsByTagName(localName);
 	}
 
 	getElementsByName(name) {
