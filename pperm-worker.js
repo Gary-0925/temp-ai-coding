@@ -296,7 +296,9 @@ class PpermTokenList {
 
 	contains(value) {
 		this.#gate.check("dom");
-		return this._values().includes(String(value));
+		const token = String(value);
+		this._validateTokens([token]);
+		return this._values().includes(token);
 	}
 
 	add(...values) {
