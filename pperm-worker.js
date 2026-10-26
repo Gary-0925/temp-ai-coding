@@ -311,6 +311,12 @@ class PpermTokenList {
 }
 
 const ordinaryAttributeProperties = new Map([
+	["id", { attribute: "id", kind: "string", field: "idName" }],
+	["className", { attribute: "class", kind: "string", field: "className" }],
+	["title", { attribute: "title", kind: "string" }],
+	["name", { attribute: "name", kind: "string" }],
+	["type", { attribute: "type", kind: "string" }],
+	["defaultValue", { attribute: "value", kind: "string" }],
 \t["accessKey", { attribute: "accesskey", kind: "string" }],
 \t["accept", { attribute: "accept", kind: "string" }],
 \t["alt", { attribute: "alt", kind: "string" }],
@@ -382,7 +388,8 @@ class PpermNode {
 			get(target, property) {
 				if (typeof property === "string" && ordinaryAttributeProperties.has(property)) {
 					target.#gate.check("dom");
-					const { attribute, kind } = ordinaryAttributeProperties.get(property);
+					const { attribute, kind, field } = ordinaryAttributeProperties.get(property);
+					if (field) return target.#data[field];
 					if (kind === "boolean") return Object.hasOwn(target.#data.attributes, attribute);
 					return target.#data.attributes[attribute] ?? "";
 				}
@@ -401,7 +408,7 @@ class PpermNode {
 			set(target, property, value) {
 				if (typeof property === "string" && ordinaryAttributeProperties.has(property)) {
 					target.#gate.check("dom");
-					const { attribute, kind } = ordinaryAttributeProperties.get(property);
+					const { attribute, kind, field } = ordinaryAttributeProperties.get(property);
 					let next = value;
 					if (kind === "boolean") { next = Boolean(value); safeAttribute(attribute, ""); }
 					else { next = String(value); safeAttribute(attribute, next); }
@@ -409,6 +416,7 @@ class PpermNode {
 						if (next) target.#data.attributes[attribute] = "";
 						else delete target.#data.attributes[attribute];
 					} else target.#data.attributes[attribute] = next;
+					if (field) target.#data[field] = next;
 					emitMutation(target.#data, "reflectedProperty", { property, attribute, value: next, kind });
 					return true;
 				}
@@ -433,10 +441,6 @@ class PpermNode {
 	}
 
 
-	get id() { this.#gate.check("dom"); return this.#data.idName; }
-	set id(value) { this.#gate.check("dom"); const text=String(value); this.#data.idName=text; this.#data.attributes.id=text; emitMutation(this.#data,"attribute",{name:"id",value:text}); }
-	get className() { this.#gate.check("dom"); return this.#data.className; }
-	set className(value) { this.#gate.check("dom"); const text=String(value); this.#data.className=text; this.#data.attributes.class=text; emitMutation(this.#data,"attribute",{name:"class",value:text}); }
 	get tagName() { this.#gate.check("dom"); return this.#data.tagName; }
 	get nodeName() { this.#gate.check("dom"); return this.#data.tagName; }
 	get nodeType() { this.#gate.check("dom"); return this.#data.nodeType; }
@@ -611,20 +615,12 @@ class PpermNode {
 	set src(value) { this.#gate.check("dom"); const text=String(value);safeAttribute("src",text);this.#data.attributes.src=text;emitMutation(this.#data,"attribute",{name:"src",value:text}); }
 	get poster() { this.#gate.check("dom"); return this.#data.attributes.poster??""; }
 	set poster(value) { this.#gate.check("dom"); const text=String(value);safeAttribute("poster",text);this.#data.attributes.poster=text;emitMutation(this.#data,"attribute",{name:"poster",value:text}); }
-	get title() { this.#gate.check("dom"); return this.#data.attributes.title??""; }
-	set title(value) { this.#gate.check("dom"); const text=String(value);this.#data.attributes.title=text;emitMutation(this.#data,"attribute",{name:"title",value:text}); }
 	get value() { this.#gate.check("dom"); return this.#data.value??this.#data.attributes.value??""; }
 	set value(value) { this.#gate.check("dom"); if(value!==null&&(typeof value==="object"||typeof value==="function"))throw new TypeError("DOM property value must be primitive");this.#data.value=value;emitMutation(this.#data,"property",{property:"value",value}); }
 	get checked() { this.#gate.check("dom"); return this.#data.checked ?? Object.hasOwn(this.#data.attributes, "checked"); }
 	set checked(value) { this.#gate.check("dom"); this.#data.checked=Boolean(value);emitMutation(this.#data,"property",{property:"checked",value:this.#data.checked}); }
 	get disabled() { this.#gate.check("dom"); return this.#data.disabled ?? Object.hasOwn(this.#data.attributes, "disabled"); }
 	set disabled(value) { this.#gate.check("dom"); this.#data.disabled = Boolean(value); if (this.#data.disabled) this.#data.attributes.disabled = ""; else delete this.#data.attributes.disabled; emitMutation(this.#data, "property", { property: "disabled", value: this.#data.disabled }); }
-	get name() { this.#gate.check("dom"); return this.#data.attributes.name??""; }
-	set name(value) { this.#gate.check("dom"); const text=String(value);this.#data.attributes.name=text;emitMutation(this.#data,"attribute",{name:"name",value:text}); }
-	get type() { this.#gate.check("dom"); return this.#data.attributes.type??""; }
-	set type(value) { this.#gate.check("dom"); const text=String(value);this.#data.attributes.type=text;emitMutation(this.#data,"attribute",{name:"type",value:text}); }
-	get defaultValue() { this.#gate.check("dom"); return this.#data.attributes.value ?? ""; }
-	set defaultValue(value) { this.#gate.check("dom"); this.setAttribute("value", value); }
 
 	get selected() { this.#gate.check("dom"); return this.#data.selected ?? Object.hasOwn(this.#data.attributes, "selected"); }
 	set selected(value) { this.#gate.check("dom"); this.#data.selected = Boolean(value); emitMutation(this.#data, "property", { property: "selected", value: this.#data.selected }); }
