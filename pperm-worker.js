@@ -61,8 +61,30 @@ function mutate(op, node, data = {}) {
 function wrap(node) {
 	if (!node) return null;
 	const style = new Proxy({}, {
-		get(_, key) { return node.styleData[key] ?? ""; },
-		set(_, key, value) { node.styleData[key] = String(value); mutate("style", node, { property: String(key), value: String(value) }); return true; }
+		get(_, key) {
+			if (key === "setProperty") return (name, value, priority = "") => {
+				const property = String(name);
+				const cssValue = String(value) + (priority ? " !" + String(priority) : "");
+				node.styleData[property.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] = cssValue;
+				mutate("style", node, { property, value: cssValue });
+			};
+			if (key === "getPropertyValue") return name => node.styleData[String(name).replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] ?? "";
+			if (key === "removeProperty") return name => {
+				const property = String(name);
+				const keyName = property.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+				const previous = node.styleData[keyName] ?? "";
+				delete node.styleData[keyName];
+				mutate("style", node, { property, value: "" });
+				return previous;
+			};
+			return node.styleData[key] ?? "";
+		},
+		set(_, key, value) {
+			const property = String(key);
+			node.styleData[property] = String(value);
+			mutate("style", node, { property, value: String(value) });
+			return true;
+		}
 	});
 	const classList = {
 		contains: value => node.className.split(/\s+/).includes(String(value)),
