@@ -310,6 +310,60 @@ class PpermTokenList {
 	}
 }
 
+const ordinaryAttributeProperties = new Map([
+\t["accessKey", { attribute: "accesskey", kind: "string" }],
+\t["accept", { attribute: "accept", kind: "string" }],
+\t["alt", { attribute: "alt", kind: "string" }],
+\t["autocomplete", { attribute: "autocomplete", kind: "string" }],
+\t["capture", { attribute: "capture", kind: "string" }],
+\t["cite", { attribute: "cite", kind: "string" }],
+\t["contentEditable", { attribute: "contenteditable", kind: "string" }],
+\t["crossOrigin", { attribute: "crossorigin", kind: "string" }],
+\t["dir", { attribute: "dir", kind: "string" }],
+\t["draggable", { attribute: "draggable", kind: "string" }],
+\t["enterKeyHint", { attribute: "enterkeyhint", kind: "string" }],
+\t["formEnctype", { attribute: "formenctype", kind: "string" }],
+\t["formMethod", { attribute: "formmethod", kind: "string" }],
+\t["formTarget", { attribute: "formtarget", kind: "string" }],
+\t["htmlFor", { attribute: "for", kind: "string" }],
+\t["inputMode", { attribute: "inputmode", kind: "string" }],
+\t["lang", { attribute: "lang", kind: "string" }],
+\t["max", { attribute: "max", kind: "string" }],
+\t["media", { attribute: "media", kind: "string" }],
+\t["min", { attribute: "min", kind: "string" }],
+\t["placeholder", { attribute: "placeholder", kind: "string" }],
+\t["referrerPolicy", { attribute: "referrerpolicy", kind: "string" }],
+\t["rel", { attribute: "rel", kind: "string" }],
+\t["role", { attribute: "role", kind: "string" }],
+\t["scope", { attribute: "scope", kind: "string" }],
+\t["slot", { attribute: "slot", kind: "string" }],
+\t["spellcheck", { attribute: "spellcheck", kind: "string" }],
+\t["step", { attribute: "step", kind: "string" }],
+\t["target", { attribute: "target", kind: "string" }],
+\t["translate", { attribute: "translate", kind: "string" }],
+\t["wrap", { attribute: "wrap", kind: "string" }],
+\t["label", { attribute: "label", kind: "string" }],
+\t["sizes", { attribute: "sizes", kind: "string" }],
+\t["defaultSelected", { attribute: "selected", kind: "boolean" }],
+\t["hidden", { attribute: "hidden", kind: "boolean" }],
+\t["multiple", { attribute: "multiple", kind: "boolean" }],
+\t["required", { attribute: "required", kind: "boolean" }],
+\t["readOnly", { attribute: "readonly", kind: "boolean" }],
+\t["autofocus", { attribute: "autofocus", kind: "boolean" }],
+\t["controls", { attribute: "controls", kind: "boolean" }],
+\t["loop", { attribute: "loop", kind: "boolean" }],
+\t["muted", { attribute: "muted", kind: "boolean" }],
+\t["open", { attribute: "open", kind: "boolean" }],
+\t["reversed", { attribute: "reversed", kind: "boolean" }],
+\t["noValidate", { attribute: "novalidate", kind: "boolean" }],
+\t["playsInline", { attribute: "playsinline", kind: "boolean" }],
+\t["defaultChecked", { attribute: "checked", kind: "boolean" }],
+\t["defaultMuted", { attribute: "muted", kind: "boolean" }],
+\t["disablePictureInPicture", { attribute: "disablepictureinpicture", kind: "boolean" }],
+\t["disableRemotePlayback", { attribute: "disableremoteplayback", kind: "boolean" }],
+]);
+const eventPropertyNames = new Set(["onclick","onchange","oninput","onsubmit","onfocus","onblur","ondblclick","oncontextmenu","onmousedown","onmouseup","onmousemove","onmouseover","onmouseout","onmouseenter","onmouseleave","onkeydown","onkeyup","onkeypress","onwheel","onscroll","onload","onerror","onreset","onselect","oninvalid","onfocusin","onfocusout","onpointerdown","onpointerup","onpointermove","onpointerover","onpointerout","onpointerenter","onpointerleave","onpointercancel","ontouchstart","ontouchmove","ontouchend","ontouchcancel","ondrag","ondragstart","ondragend","ondragenter","ondragover","ondragleave","ondrop","oncopy","oncut","onpaste","onanimationstart","onanimationend","onanimationiteration","ontransitionend","onplay","onpause","onended","ontimeupdate","onvolumechange","oncanplay","onwaiting","onprogress","oncanplaythrough","onratechange","onseeking","onseeked"]);
+
 class PpermNode {
 	#data;
 	#gate;
@@ -324,6 +378,58 @@ class PpermNode {
 		this.#eventProperties = new Map();
 		nodeDataByInstance.set(this, this.#data);
 		Object.preventExtensions(this);
+		const proxy = new Proxy(this, {
+			get(target, property) {
+				if (typeof property === "string" && ordinaryAttributeProperties.has(property)) {
+					target.#gate.check("dom");
+					const { attribute, kind } = ordinaryAttributeProperties.get(property);
+					if (kind === "boolean") return Object.hasOwn(target.#data.attributes, attribute);
+					return target.#data.attributes[attribute] ?? "";
+				}
+				if (typeof property === "string" && eventPropertyNames.has(property)) {
+					target.#gate.check("dom");
+					return target.#eventProperties.get(property) ?? null;
+				}
+				if (typeof property === "string" && ["__proto__", "prototype", "constructor"].includes(property)) denied(property);
+				if (property in target) {
+					const value = Reflect.get(target, property, target);
+					return typeof value === "function" ? value.bind(target) : value;
+				}
+				if (typeof property === "string") denied("DOM property " + property);
+				return Reflect.get(target, property, target);
+			},
+			set(target, property, value) {
+				if (typeof property === "string" && ordinaryAttributeProperties.has(property)) {
+					target.#gate.check("dom");
+					const { attribute, kind } = ordinaryAttributeProperties.get(property);
+					let next = value;
+					if (kind === "boolean") next = Boolean(value);
+					else { next = String(value); safeAttribute(attribute, next); }
+					if (kind === "boolean") {
+						if (next) target.#data.attributes[attribute] = "";
+						else delete target.#data.attributes[attribute];
+					} else target.#data.attributes[attribute] = next;
+					emitMutation(target.#data, "reflectedProperty", { property, attribute, value: next, kind });
+					return true;
+				}
+				if (typeof property === "string" && eventPropertyNames.has(property)) {
+					target.#gate.check("dom");
+					if (value != null && typeof value !== "function") throw new TypeError(property + " must be a function or null");
+					const old = target.#eventProperties.get(property);
+					const type = property.slice(2);
+					if (old) target.removeEventListener(type, old);
+					if (value == null) target.#eventProperties.delete(property);
+					else { target.#eventProperties.set(property, value); target.addEventListener(type, value); }
+					return true;
+				}
+				if (typeof property === "string" && ["__proto__", "prototype", "constructor"].includes(property)) denied(property);
+				if (property in target) return Reflect.set(target, property, value, target);
+				if (typeof property === "string") denied("DOM property " + property);
+				return Reflect.set(target, property, value, target);
+			}
+		});
+		nodeDataByInstance.set(proxy, this.#data);
+		return proxy;
 	}
 
 
@@ -519,109 +625,9 @@ class PpermNode {
 	set type(value) { this.#gate.check("dom"); const text=String(value);this.#data.attributes.type=text;emitMutation(this.#data,"attribute",{name:"type",value:text}); }
 	get defaultValue() { this.#gate.check("dom"); return this.#data.attributes.value ?? ""; }
 	set defaultValue(value) { this.#gate.check("dom"); this.setAttribute("value", value); }
-	get defaultSelected() { this.#gate.check("dom"); return Object.hasOwn(this.#data.attributes, "selected"); }
-	set defaultSelected(value) { this.#gate.check("dom"); if (value) this.#data.attributes.selected = ""; else delete this.#data.attributes.selected; emitMutation(this.#data, value ? "attribute" : "removeAttribute", value ? { name: "selected", value: "" } : { name: "selected" }); }
 
-	get accessKey() { this.#gate.check("dom"); return this.#data.attributes["accesskey"] ?? ""; }
-	set accessKey(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("accesskey", text); this.#data.attributes["accesskey"] = text; emitMutation(this.#data, "attribute", { name: "accesskey", value: text }); }
-	get accept() { this.#gate.check("dom"); return this.#data.attributes["accept"] ?? ""; }
-	set accept(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("accept", text); this.#data.attributes["accept"] = text; emitMutation(this.#data, "attribute", { name: "accept", value: text }); }
-	get alt() { this.#gate.check("dom"); return this.#data.attributes["alt"] ?? ""; }
-	set alt(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("alt", text); this.#data.attributes["alt"] = text; emitMutation(this.#data, "attribute", { name: "alt", value: text }); }
-	get autocomplete() { this.#gate.check("dom"); return this.#data.attributes["autocomplete"] ?? ""; }
-	set autocomplete(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("autocomplete", text); this.#data.attributes["autocomplete"] = text; emitMutation(this.#data, "attribute", { name: "autocomplete", value: text }); }
-	get capture() { this.#gate.check("dom"); return this.#data.attributes["capture"] ?? ""; }
-	set capture(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("capture", text); this.#data.attributes["capture"] = text; emitMutation(this.#data, "attribute", { name: "capture", value: text }); }
-	get cite() { this.#gate.check("dom"); return this.#data.attributes["cite"] ?? ""; }
-	set cite(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("cite", text); this.#data.attributes["cite"] = text; emitMutation(this.#data, "attribute", { name: "cite", value: text }); }
-	get contentEditable() { this.#gate.check("dom"); return this.#data.attributes["contenteditable"] ?? ""; }
-	set contentEditable(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("contenteditable", text); this.#data.attributes["contenteditable"] = text; emitMutation(this.#data, "attribute", { name: "contenteditable", value: text }); }
-	get crossOrigin() { this.#gate.check("dom"); return this.#data.attributes["crossorigin"] ?? ""; }
-	set crossOrigin(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("crossorigin", text); this.#data.attributes["crossorigin"] = text; emitMutation(this.#data, "attribute", { name: "crossorigin", value: text }); }
-	get dir() { this.#gate.check("dom"); return this.#data.attributes["dir"] ?? ""; }
-	set dir(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("dir", text); this.#data.attributes["dir"] = text; emitMutation(this.#data, "attribute", { name: "dir", value: text }); }
-	get draggable() { this.#gate.check("dom"); return this.#data.attributes["draggable"] ?? ""; }
-	set draggable(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("draggable", text); this.#data.attributes["draggable"] = text; emitMutation(this.#data, "attribute", { name: "draggable", value: text }); }
-	get enterKeyHint() { this.#gate.check("dom"); return this.#data.attributes["enterkeyhint"] ?? ""; }
-	set enterKeyHint(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("enterkeyhint", text); this.#data.attributes["enterkeyhint"] = text; emitMutation(this.#data, "attribute", { name: "enterkeyhint", value: text }); }
-	get formEnctype() { this.#gate.check("dom"); return this.#data.attributes["formenctype"] ?? ""; }
-	set formEnctype(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("formenctype", text); this.#data.attributes["formenctype"] = text; emitMutation(this.#data, "attribute", { name: "formenctype", value: text }); }
-	get formMethod() { this.#gate.check("dom"); return this.#data.attributes["formmethod"] ?? ""; }
-	set formMethod(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("formmethod", text); this.#data.attributes["formmethod"] = text; emitMutation(this.#data, "attribute", { name: "formmethod", value: text }); }
-	get formTarget() { this.#gate.check("dom"); return this.#data.attributes["formtarget"] ?? ""; }
-	set formTarget(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("formtarget", text); this.#data.attributes["formtarget"] = text; emitMutation(this.#data, "attribute", { name: "formtarget", value: text }); }
-	get htmlFor() { this.#gate.check("dom"); return this.#data.attributes["for"] ?? ""; }
-	set htmlFor(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("for", text); this.#data.attributes["for"] = text; emitMutation(this.#data, "attribute", { name: "for", value: text }); }
-	get inputMode() { this.#gate.check("dom"); return this.#data.attributes["inputmode"] ?? ""; }
-	set inputMode(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("inputmode", text); this.#data.attributes["inputmode"] = text; emitMutation(this.#data, "attribute", { name: "inputmode", value: text }); }
-	get lang() { this.#gate.check("dom"); return this.#data.attributes["lang"] ?? ""; }
-	set lang(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("lang", text); this.#data.attributes["lang"] = text; emitMutation(this.#data, "attribute", { name: "lang", value: text }); }
-	get max() { this.#gate.check("dom"); return this.#data.attributes["max"] ?? ""; }
-	set max(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("max", text); this.#data.attributes["max"] = text; emitMutation(this.#data, "attribute", { name: "max", value: text }); }
-	get media() { this.#gate.check("dom"); return this.#data.attributes["media"] ?? ""; }
-	set media(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("media", text); this.#data.attributes["media"] = text; emitMutation(this.#data, "attribute", { name: "media", value: text }); }
-	get min() { this.#gate.check("dom"); return this.#data.attributes["min"] ?? ""; }
-	set min(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("min", text); this.#data.attributes["min"] = text; emitMutation(this.#data, "attribute", { name: "min", value: text }); }
-	get placeholder() { this.#gate.check("dom"); return this.#data.attributes["placeholder"] ?? ""; }
-	set placeholder(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("placeholder", text); this.#data.attributes["placeholder"] = text; emitMutation(this.#data, "attribute", { name: "placeholder", value: text }); }
-	get referrerPolicy() { this.#gate.check("dom"); return this.#data.attributes["referrerpolicy"] ?? ""; }
-	set referrerPolicy(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("referrerpolicy", text); this.#data.attributes["referrerpolicy"] = text; emitMutation(this.#data, "attribute", { name: "referrerpolicy", value: text }); }
-	get rel() { this.#gate.check("dom"); return this.#data.attributes["rel"] ?? ""; }
-	set rel(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("rel", text); this.#data.attributes["rel"] = text; emitMutation(this.#data, "attribute", { name: "rel", value: text }); }
-	get role() { this.#gate.check("dom"); return this.#data.attributes["role"] ?? ""; }
-	set role(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("role", text); this.#data.attributes["role"] = text; emitMutation(this.#data, "attribute", { name: "role", value: text }); }
-	get scope() { this.#gate.check("dom"); return this.#data.attributes["scope"] ?? ""; }
-	set scope(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("scope", text); this.#data.attributes["scope"] = text; emitMutation(this.#data, "attribute", { name: "scope", value: text }); }
-	get slot() { this.#gate.check("dom"); return this.#data.attributes["slot"] ?? ""; }
-	set slot(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("slot", text); this.#data.attributes["slot"] = text; emitMutation(this.#data, "attribute", { name: "slot", value: text }); }
-	get spellcheck() { this.#gate.check("dom"); return this.#data.attributes["spellcheck"] ?? ""; }
-	set spellcheck(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("spellcheck", text); this.#data.attributes["spellcheck"] = text; emitMutation(this.#data, "attribute", { name: "spellcheck", value: text }); }
-	get step() { this.#gate.check("dom"); return this.#data.attributes["step"] ?? ""; }
-	set step(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("step", text); this.#data.attributes["step"] = text; emitMutation(this.#data, "attribute", { name: "step", value: text }); }
-	get target() { this.#gate.check("dom"); return this.#data.attributes["target"] ?? ""; }
-	set target(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("target", text); this.#data.attributes["target"] = text; emitMutation(this.#data, "attribute", { name: "target", value: text }); }
-	get translate() { this.#gate.check("dom"); return this.#data.attributes["translate"] ?? ""; }
-	set translate(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("translate", text); this.#data.attributes["translate"] = text; emitMutation(this.#data, "attribute", { name: "translate", value: text }); }
-	get wrap() { this.#gate.check("dom"); return this.#data.attributes["wrap"] ?? ""; }
-	set wrap(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("wrap", text); this.#data.attributes["wrap"] = text; emitMutation(this.#data, "attribute", { name: "wrap", value: text }); }
-	get label() { this.#gate.check("dom"); return this.#data.attributes["label"] ?? ""; }
-	set label(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("label", text); this.#data.attributes["label"] = text; emitMutation(this.#data, "attribute", { name: "label", value: text }); }
-	get sizes() { this.#gate.check("dom"); return this.#data.attributes["sizes"] ?? ""; }
-	set sizes(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("sizes", text); this.#data.attributes["sizes"] = text; emitMutation(this.#data, "attribute", { name: "sizes", value: text }); }
-	get hidden() { this.#gate.check("dom"); return Object.hasOwn(this.#data.attributes, "hidden"); }
-	set hidden(value) { this.#gate.check("dom"); if (value) this.#data.attributes["hidden"] = ""; else delete this.#data.attributes["hidden"]; emitMutation(this.#data, value ? "attribute" : "removeAttribute", value ? { name: "hidden", value: "" } : { name: "hidden" }); }
-	get multiple() { this.#gate.check("dom"); return Object.hasOwn(this.#data.attributes, "multiple"); }
-	set multiple(value) { this.#gate.check("dom"); if (value) this.#data.attributes["multiple"] = ""; else delete this.#data.attributes["multiple"]; emitMutation(this.#data, value ? "attribute" : "removeAttribute", value ? { name: "multiple", value: "" } : { name: "multiple" }); }
-	get required() { this.#gate.check("dom"); return Object.hasOwn(this.#data.attributes, "required"); }
-	set required(value) { this.#gate.check("dom"); if (value) this.#data.attributes["required"] = ""; else delete this.#data.attributes["required"]; emitMutation(this.#data, value ? "attribute" : "removeAttribute", value ? { name: "required", value: "" } : { name: "required" }); }
-	get readOnly() { this.#gate.check("dom"); return Object.hasOwn(this.#data.attributes, "readonly"); }
-	set readOnly(value) { this.#gate.check("dom"); if (value) this.#data.attributes["readonly"] = ""; else delete this.#data.attributes["readonly"]; emitMutation(this.#data, value ? "attribute" : "removeAttribute", value ? { name: "readonly", value: "" } : { name: "readonly" }); }
 	get selected() { this.#gate.check("dom"); return this.#data.selected ?? Object.hasOwn(this.#data.attributes, "selected"); }
 	set selected(value) { this.#gate.check("dom"); this.#data.selected = Boolean(value); emitMutation(this.#data, "property", { property: "selected", value: this.#data.selected }); }
-	get autofocus() { this.#gate.check("dom"); return Object.hasOwn(this.#data.attributes, "autofocus"); }
-	set autofocus(value) { this.#gate.check("dom"); if (value) this.#data.attributes["autofocus"] = ""; else delete this.#data.attributes["autofocus"]; emitMutation(this.#data, value ? "attribute" : "removeAttribute", value ? { name: "autofocus", value: "" } : { name: "autofocus" }); }
-	get controls() { this.#gate.check("dom"); return Object.hasOwn(this.#data.attributes, "controls"); }
-	set controls(value) { this.#gate.check("dom"); if (value) this.#data.attributes["controls"] = ""; else delete this.#data.attributes["controls"]; emitMutation(this.#data, value ? "attribute" : "removeAttribute", value ? { name: "controls", value: "" } : { name: "controls" }); }
-	get loop() { this.#gate.check("dom"); return Object.hasOwn(this.#data.attributes, "loop"); }
-	set loop(value) { this.#gate.check("dom"); if (value) this.#data.attributes["loop"] = ""; else delete this.#data.attributes["loop"]; emitMutation(this.#data, value ? "attribute" : "removeAttribute", value ? { name: "loop", value: "" } : { name: "loop" }); }
-	get muted() { this.#gate.check("dom"); return Object.hasOwn(this.#data.attributes, "muted"); }
-	set muted(value) { this.#gate.check("dom"); if (value) this.#data.attributes["muted"] = ""; else delete this.#data.attributes["muted"]; emitMutation(this.#data, value ? "attribute" : "removeAttribute", value ? { name: "muted", value: "" } : { name: "muted" }); }
-	get open() { this.#gate.check("dom"); return Object.hasOwn(this.#data.attributes, "open"); }
-	set open(value) { this.#gate.check("dom"); if (value) this.#data.attributes["open"] = ""; else delete this.#data.attributes["open"]; emitMutation(this.#data, value ? "attribute" : "removeAttribute", value ? { name: "open", value: "" } : { name: "open" }); }
-	get reversed() { this.#gate.check("dom"); return Object.hasOwn(this.#data.attributes, "reversed"); }
-	set reversed(value) { this.#gate.check("dom"); if (value) this.#data.attributes["reversed"] = ""; else delete this.#data.attributes["reversed"]; emitMutation(this.#data, value ? "attribute" : "removeAttribute", value ? { name: "reversed", value: "" } : { name: "reversed" }); }
-	get noValidate() { this.#gate.check("dom"); return Object.hasOwn(this.#data.attributes, "novalidate"); }
-	set noValidate(value) { this.#gate.check("dom"); if (value) this.#data.attributes["novalidate"] = ""; else delete this.#data.attributes["novalidate"]; emitMutation(this.#data, value ? "attribute" : "removeAttribute", value ? { name: "novalidate", value: "" } : { name: "novalidate" }); }
-	get playsInline() { this.#gate.check("dom"); return Object.hasOwn(this.#data.attributes, "playsinline"); }
-	set playsInline(value) { this.#gate.check("dom"); if (value) this.#data.attributes["playsinline"] = ""; else delete this.#data.attributes["playsinline"]; emitMutation(this.#data, value ? "attribute" : "removeAttribute", value ? { name: "playsinline", value: "" } : { name: "playsinline" }); }
-	get defaultChecked() { this.#gate.check("dom"); return Object.hasOwn(this.#data.attributes, "defaultchecked"); }
-	set defaultChecked(value) { this.#gate.check("dom"); if (value) this.#data.attributes["defaultchecked"] = ""; else delete this.#data.attributes["defaultchecked"]; emitMutation(this.#data, value ? "attribute" : "removeAttribute", value ? { name: "defaultchecked", value: "" } : { name: "defaultchecked" }); }
-	get defaultMuted() { this.#gate.check("dom"); return Object.hasOwn(this.#data.attributes, "defaultmuted"); }
-	set defaultMuted(value) { this.#gate.check("dom"); if (value) this.#data.attributes["defaultmuted"] = ""; else delete this.#data.attributes["defaultmuted"]; emitMutation(this.#data, value ? "attribute" : "removeAttribute", value ? { name: "defaultmuted", value: "" } : { name: "defaultmuted" }); }
-	get disablePictureInPicture() { this.#gate.check("dom"); return Object.hasOwn(this.#data.attributes, "disablepictureinpicture"); }
-	set disablePictureInPicture(value) { this.#gate.check("dom"); if (value) this.#data.attributes["disablepictureinpicture"] = ""; else delete this.#data.attributes["disablepictureinpicture"]; emitMutation(this.#data, value ? "attribute" : "removeAttribute", value ? { name: "disablepictureinpicture", value: "" } : { name: "disablepictureinpicture" }); }
-	get disableRemotePlayback() { this.#gate.check("dom"); return Object.hasOwn(this.#data.attributes, "disableremoteplayback"); }
-	set disableRemotePlayback(value) { this.#gate.check("dom"); if (value) this.#data.attributes["disableremoteplayback"] = ""; else delete this.#data.attributes["disableremoteplayback"]; emitMutation(this.#data, value ? "attribute" : "removeAttribute", value ? { name: "disableremoteplayback", value: "" } : { name: "disableremoteplayback" }); }
 	get tabIndex() { this.#gate.check("dom"); return this.#data.tabIndex ?? Number(this.#data.attributes["tabindex"] ?? 0); }
 	set tabIndex(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("tabIndex must be a finite number"); this.#data.tabIndex = number; emitMutation(this.#data, "property", { property: "tabIndex", value: number }); }
 	get width() { this.#gate.check("dom"); return this.#data.width ?? Number(this.#data.attributes["width"] ?? 0); }
@@ -646,720 +652,6 @@ class PpermNode {
 	set start(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("start must be a finite number"); this.#data.start = number; emitMutation(this.#data, "property", { property: "start", value: number }); }
 	get span() { this.#gate.check("dom"); return this.#data.span ?? Number(this.#data.attributes["span"] ?? 0); }
 	set span(value) { this.#gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("span must be a finite number"); this.#data.span = number; emitMutation(this.#data, "property", { property: "span", value: number }); }
-
-	get onclick() { this.#gate.check("dom"); return this.#eventProperties.get("onclick") ?? null; }
-	set onclick(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onclick must be a function or null");
-		const old = this.#eventProperties.get("onclick");
-		if (old) this.removeEventListener("click", old);
-		if (value == null) { this.#eventProperties.delete("onclick"); return; }
-		this.#eventProperties.set("onclick", value);
-		this.addEventListener("click", value);
-	}
-
-	get onchange() { this.#gate.check("dom"); return this.#eventProperties.get("onchange") ?? null; }
-	set onchange(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onchange must be a function or null");
-		const old = this.#eventProperties.get("onchange");
-		if (old) this.removeEventListener("change", old);
-		if (value == null) { this.#eventProperties.delete("onchange"); return; }
-		this.#eventProperties.set("onchange", value);
-		this.addEventListener("change", value);
-	}
-
-	get oninput() { this.#gate.check("dom"); return this.#eventProperties.get("oninput") ?? null; }
-	set oninput(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("oninput must be a function or null");
-		const old = this.#eventProperties.get("oninput");
-		if (old) this.removeEventListener("input", old);
-		if (value == null) { this.#eventProperties.delete("oninput"); return; }
-		this.#eventProperties.set("oninput", value);
-		this.addEventListener("input", value);
-	}
-
-	get onsubmit() { this.#gate.check("dom"); return this.#eventProperties.get("onsubmit") ?? null; }
-	set onsubmit(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onsubmit must be a function or null");
-		const old = this.#eventProperties.get("onsubmit");
-		if (old) this.removeEventListener("submit", old);
-		if (value == null) { this.#eventProperties.delete("onsubmit"); return; }
-		this.#eventProperties.set("onsubmit", value);
-		this.addEventListener("submit", value);
-	}
-
-	get onfocus() { this.#gate.check("dom"); return this.#eventProperties.get("onfocus") ?? null; }
-	set onfocus(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onfocus must be a function or null");
-		const old = this.#eventProperties.get("onfocus");
-		if (old) this.removeEventListener("focus", old);
-		if (value == null) { this.#eventProperties.delete("onfocus"); return; }
-		this.#eventProperties.set("onfocus", value);
-		this.addEventListener("focus", value);
-	}
-
-	get onblur() { this.#gate.check("dom"); return this.#eventProperties.get("onblur") ?? null; }
-	set onblur(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onblur must be a function or null");
-		const old = this.#eventProperties.get("onblur");
-		if (old) this.removeEventListener("blur", old);
-		if (value == null) { this.#eventProperties.delete("onblur"); return; }
-		this.#eventProperties.set("onblur", value);
-		this.addEventListener("blur", value);
-	}
-	get ondblclick() { this.#gate.check("dom"); return this.#eventProperties.get("ondblclick") ?? null; }
-	set ondblclick(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("ondblclick must be a function or null");
-		const old = this.#eventProperties.get("ondblclick");
-		if (old) this.removeEventListener("dblclick", old);
-		if (value == null) { this.#eventProperties.delete("ondblclick"); return; }
-		this.#eventProperties.set("ondblclick", value);
-		this.addEventListener("dblclick", value);
-	}
-
-	get oncontextmenu() { this.#gate.check("dom"); return this.#eventProperties.get("oncontextmenu") ?? null; }
-	set oncontextmenu(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("oncontextmenu must be a function or null");
-		const old = this.#eventProperties.get("oncontextmenu");
-		if (old) this.removeEventListener("contextmenu", old);
-		if (value == null) { this.#eventProperties.delete("oncontextmenu"); return; }
-		this.#eventProperties.set("oncontextmenu", value);
-		this.addEventListener("contextmenu", value);
-	}
-
-	get onmousedown() { this.#gate.check("dom"); return this.#eventProperties.get("onmousedown") ?? null; }
-	set onmousedown(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onmousedown must be a function or null");
-		const old = this.#eventProperties.get("onmousedown");
-		if (old) this.removeEventListener("mousedown", old);
-		if (value == null) { this.#eventProperties.delete("onmousedown"); return; }
-		this.#eventProperties.set("onmousedown", value);
-		this.addEventListener("mousedown", value);
-	}
-
-	get onmouseup() { this.#gate.check("dom"); return this.#eventProperties.get("onmouseup") ?? null; }
-	set onmouseup(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onmouseup must be a function or null");
-		const old = this.#eventProperties.get("onmouseup");
-		if (old) this.removeEventListener("mouseup", old);
-		if (value == null) { this.#eventProperties.delete("onmouseup"); return; }
-		this.#eventProperties.set("onmouseup", value);
-		this.addEventListener("mouseup", value);
-	}
-
-	get onmousemove() { this.#gate.check("dom"); return this.#eventProperties.get("onmousemove") ?? null; }
-	set onmousemove(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onmousemove must be a function or null");
-		const old = this.#eventProperties.get("onmousemove");
-		if (old) this.removeEventListener("mousemove", old);
-		if (value == null) { this.#eventProperties.delete("onmousemove"); return; }
-		this.#eventProperties.set("onmousemove", value);
-		this.addEventListener("mousemove", value);
-	}
-
-	get onmouseover() { this.#gate.check("dom"); return this.#eventProperties.get("onmouseover") ?? null; }
-	set onmouseover(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onmouseover must be a function or null");
-		const old = this.#eventProperties.get("onmouseover");
-		if (old) this.removeEventListener("mouseover", old);
-		if (value == null) { this.#eventProperties.delete("onmouseover"); return; }
-		this.#eventProperties.set("onmouseover", value);
-		this.addEventListener("mouseover", value);
-	}
-
-	get onmouseout() { this.#gate.check("dom"); return this.#eventProperties.get("onmouseout") ?? null; }
-	set onmouseout(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onmouseout must be a function or null");
-		const old = this.#eventProperties.get("onmouseout");
-		if (old) this.removeEventListener("mouseout", old);
-		if (value == null) { this.#eventProperties.delete("onmouseout"); return; }
-		this.#eventProperties.set("onmouseout", value);
-		this.addEventListener("mouseout", value);
-	}
-
-	get onmouseenter() { this.#gate.check("dom"); return this.#eventProperties.get("onmouseenter") ?? null; }
-	set onmouseenter(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onmouseenter must be a function or null");
-		const old = this.#eventProperties.get("onmouseenter");
-		if (old) this.removeEventListener("mouseenter", old);
-		if (value == null) { this.#eventProperties.delete("onmouseenter"); return; }
-		this.#eventProperties.set("onmouseenter", value);
-		this.addEventListener("mouseenter", value);
-	}
-
-	get onmouseleave() { this.#gate.check("dom"); return this.#eventProperties.get("onmouseleave") ?? null; }
-	set onmouseleave(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onmouseleave must be a function or null");
-		const old = this.#eventProperties.get("onmouseleave");
-		if (old) this.removeEventListener("mouseleave", old);
-		if (value == null) { this.#eventProperties.delete("onmouseleave"); return; }
-		this.#eventProperties.set("onmouseleave", value);
-		this.addEventListener("mouseleave", value);
-	}
-
-	get onkeydown() { this.#gate.check("dom"); return this.#eventProperties.get("onkeydown") ?? null; }
-	set onkeydown(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onkeydown must be a function or null");
-		const old = this.#eventProperties.get("onkeydown");
-		if (old) this.removeEventListener("keydown", old);
-		if (value == null) { this.#eventProperties.delete("onkeydown"); return; }
-		this.#eventProperties.set("onkeydown", value);
-		this.addEventListener("keydown", value);
-	}
-
-	get onkeyup() { this.#gate.check("dom"); return this.#eventProperties.get("onkeyup") ?? null; }
-	set onkeyup(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onkeyup must be a function or null");
-		const old = this.#eventProperties.get("onkeyup");
-		if (old) this.removeEventListener("keyup", old);
-		if (value == null) { this.#eventProperties.delete("onkeyup"); return; }
-		this.#eventProperties.set("onkeyup", value);
-		this.addEventListener("keyup", value);
-	}
-
-	get onkeypress() { this.#gate.check("dom"); return this.#eventProperties.get("onkeypress") ?? null; }
-	set onkeypress(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onkeypress must be a function or null");
-		const old = this.#eventProperties.get("onkeypress");
-		if (old) this.removeEventListener("keypress", old);
-		if (value == null) { this.#eventProperties.delete("onkeypress"); return; }
-		this.#eventProperties.set("onkeypress", value);
-		this.addEventListener("keypress", value);
-	}
-
-	get onwheel() { this.#gate.check("dom"); return this.#eventProperties.get("onwheel") ?? null; }
-	set onwheel(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onwheel must be a function or null");
-		const old = this.#eventProperties.get("onwheel");
-		if (old) this.removeEventListener("wheel", old);
-		if (value == null) { this.#eventProperties.delete("onwheel"); return; }
-		this.#eventProperties.set("onwheel", value);
-		this.addEventListener("wheel", value);
-	}
-
-	get onscroll() { this.#gate.check("dom"); return this.#eventProperties.get("onscroll") ?? null; }
-	set onscroll(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onscroll must be a function or null");
-		const old = this.#eventProperties.get("onscroll");
-		if (old) this.removeEventListener("scroll", old);
-		if (value == null) { this.#eventProperties.delete("onscroll"); return; }
-		this.#eventProperties.set("onscroll", value);
-		this.addEventListener("scroll", value);
-	}
-
-	get onload() { this.#gate.check("dom"); return this.#eventProperties.get("onload") ?? null; }
-	set onload(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onload must be a function or null");
-		const old = this.#eventProperties.get("onload");
-		if (old) this.removeEventListener("load", old);
-		if (value == null) { this.#eventProperties.delete("onload"); return; }
-		this.#eventProperties.set("onload", value);
-		this.addEventListener("load", value);
-	}
-
-	get onerror() { this.#gate.check("dom"); return this.#eventProperties.get("onerror") ?? null; }
-	set onerror(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onerror must be a function or null");
-		const old = this.#eventProperties.get("onerror");
-		if (old) this.removeEventListener("error", old);
-		if (value == null) { this.#eventProperties.delete("onerror"); return; }
-		this.#eventProperties.set("onerror", value);
-		this.addEventListener("error", value);
-	}
-
-	get onreset() { this.#gate.check("dom"); return this.#eventProperties.get("onreset") ?? null; }
-	set onreset(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onreset must be a function or null");
-		const old = this.#eventProperties.get("onreset");
-		if (old) this.removeEventListener("reset", old);
-		if (value == null) { this.#eventProperties.delete("onreset"); return; }
-		this.#eventProperties.set("onreset", value);
-		this.addEventListener("reset", value);
-	}
-
-	get onselect() { this.#gate.check("dom"); return this.#eventProperties.get("onselect") ?? null; }
-	set onselect(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onselect must be a function or null");
-		const old = this.#eventProperties.get("onselect");
-		if (old) this.removeEventListener("select", old);
-		if (value == null) { this.#eventProperties.delete("onselect"); return; }
-		this.#eventProperties.set("onselect", value);
-		this.addEventListener("select", value);
-	}
-
-	get oninvalid() { this.#gate.check("dom"); return this.#eventProperties.get("oninvalid") ?? null; }
-	set oninvalid(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("oninvalid must be a function or null");
-		const old = this.#eventProperties.get("oninvalid");
-		if (old) this.removeEventListener("invalid", old);
-		if (value == null) { this.#eventProperties.delete("oninvalid"); return; }
-		this.#eventProperties.set("oninvalid", value);
-		this.addEventListener("invalid", value);
-	}
-
-	get onfocusin() { this.#gate.check("dom"); return this.#eventProperties.get("onfocusin") ?? null; }
-	set onfocusin(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onfocusin must be a function or null");
-		const old = this.#eventProperties.get("onfocusin");
-		if (old) this.removeEventListener("focusin", old);
-		if (value == null) { this.#eventProperties.delete("onfocusin"); return; }
-		this.#eventProperties.set("onfocusin", value);
-		this.addEventListener("focusin", value);
-	}
-
-	get onfocusout() { this.#gate.check("dom"); return this.#eventProperties.get("onfocusout") ?? null; }
-	set onfocusout(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onfocusout must be a function or null");
-		const old = this.#eventProperties.get("onfocusout");
-		if (old) this.removeEventListener("focusout", old);
-		if (value == null) { this.#eventProperties.delete("onfocusout"); return; }
-		this.#eventProperties.set("onfocusout", value);
-		this.addEventListener("focusout", value);
-	}
-
-	get onpointerdown() { this.#gate.check("dom"); return this.#eventProperties.get("onpointerdown") ?? null; }
-	set onpointerdown(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onpointerdown must be a function or null");
-		const old = this.#eventProperties.get("onpointerdown");
-		if (old) this.removeEventListener("pointerdown", old);
-		if (value == null) { this.#eventProperties.delete("onpointerdown"); return; }
-		this.#eventProperties.set("onpointerdown", value);
-		this.addEventListener("pointerdown", value);
-	}
-
-	get onpointerup() { this.#gate.check("dom"); return this.#eventProperties.get("onpointerup") ?? null; }
-	set onpointerup(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onpointerup must be a function or null");
-		const old = this.#eventProperties.get("onpointerup");
-		if (old) this.removeEventListener("pointerup", old);
-		if (value == null) { this.#eventProperties.delete("onpointerup"); return; }
-		this.#eventProperties.set("onpointerup", value);
-		this.addEventListener("pointerup", value);
-	}
-
-	get onpointermove() { this.#gate.check("dom"); return this.#eventProperties.get("onpointermove") ?? null; }
-	set onpointermove(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onpointermove must be a function or null");
-		const old = this.#eventProperties.get("onpointermove");
-		if (old) this.removeEventListener("pointermove", old);
-		if (value == null) { this.#eventProperties.delete("onpointermove"); return; }
-		this.#eventProperties.set("onpointermove", value);
-		this.addEventListener("pointermove", value);
-	}
-
-	get onpointerover() { this.#gate.check("dom"); return this.#eventProperties.get("onpointerover") ?? null; }
-	set onpointerover(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onpointerover must be a function or null");
-		const old = this.#eventProperties.get("onpointerover");
-		if (old) this.removeEventListener("pointerover", old);
-		if (value == null) { this.#eventProperties.delete("onpointerover"); return; }
-		this.#eventProperties.set("onpointerover", value);
-		this.addEventListener("pointerover", value);
-	}
-
-	get onpointerout() { this.#gate.check("dom"); return this.#eventProperties.get("onpointerout") ?? null; }
-	set onpointerout(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onpointerout must be a function or null");
-		const old = this.#eventProperties.get("onpointerout");
-		if (old) this.removeEventListener("pointerout", old);
-		if (value == null) { this.#eventProperties.delete("onpointerout"); return; }
-		this.#eventProperties.set("onpointerout", value);
-		this.addEventListener("pointerout", value);
-	}
-
-	get onpointerenter() { this.#gate.check("dom"); return this.#eventProperties.get("onpointerenter") ?? null; }
-	set onpointerenter(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onpointerenter must be a function or null");
-		const old = this.#eventProperties.get("onpointerenter");
-		if (old) this.removeEventListener("pointerenter", old);
-		if (value == null) { this.#eventProperties.delete("onpointerenter"); return; }
-		this.#eventProperties.set("onpointerenter", value);
-		this.addEventListener("pointerenter", value);
-	}
-
-	get onpointerleave() { this.#gate.check("dom"); return this.#eventProperties.get("onpointerleave") ?? null; }
-	set onpointerleave(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onpointerleave must be a function or null");
-		const old = this.#eventProperties.get("onpointerleave");
-		if (old) this.removeEventListener("pointerleave", old);
-		if (value == null) { this.#eventProperties.delete("onpointerleave"); return; }
-		this.#eventProperties.set("onpointerleave", value);
-		this.addEventListener("pointerleave", value);
-	}
-
-	get onpointercancel() { this.#gate.check("dom"); return this.#eventProperties.get("onpointercancel") ?? null; }
-	set onpointercancel(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onpointercancel must be a function or null");
-		const old = this.#eventProperties.get("onpointercancel");
-		if (old) this.removeEventListener("pointercancel", old);
-		if (value == null) { this.#eventProperties.delete("onpointercancel"); return; }
-		this.#eventProperties.set("onpointercancel", value);
-		this.addEventListener("pointercancel", value);
-	}
-
-	get ontouchstart() { this.#gate.check("dom"); return this.#eventProperties.get("ontouchstart") ?? null; }
-	set ontouchstart(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("ontouchstart must be a function or null");
-		const old = this.#eventProperties.get("ontouchstart");
-		if (old) this.removeEventListener("touchstart", old);
-		if (value == null) { this.#eventProperties.delete("ontouchstart"); return; }
-		this.#eventProperties.set("ontouchstart", value);
-		this.addEventListener("touchstart", value);
-	}
-
-	get ontouchmove() { this.#gate.check("dom"); return this.#eventProperties.get("ontouchmove") ?? null; }
-	set ontouchmove(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("ontouchmove must be a function or null");
-		const old = this.#eventProperties.get("ontouchmove");
-		if (old) this.removeEventListener("touchmove", old);
-		if (value == null) { this.#eventProperties.delete("ontouchmove"); return; }
-		this.#eventProperties.set("ontouchmove", value);
-		this.addEventListener("touchmove", value);
-	}
-
-	get ontouchend() { this.#gate.check("dom"); return this.#eventProperties.get("ontouchend") ?? null; }
-	set ontouchend(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("ontouchend must be a function or null");
-		const old = this.#eventProperties.get("ontouchend");
-		if (old) this.removeEventListener("touchend", old);
-		if (value == null) { this.#eventProperties.delete("ontouchend"); return; }
-		this.#eventProperties.set("ontouchend", value);
-		this.addEventListener("touchend", value);
-	}
-
-	get ontouchcancel() { this.#gate.check("dom"); return this.#eventProperties.get("ontouchcancel") ?? null; }
-	set ontouchcancel(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("ontouchcancel must be a function or null");
-		const old = this.#eventProperties.get("ontouchcancel");
-		if (old) this.removeEventListener("touchcancel", old);
-		if (value == null) { this.#eventProperties.delete("ontouchcancel"); return; }
-		this.#eventProperties.set("ontouchcancel", value);
-		this.addEventListener("touchcancel", value);
-	}
-
-	get ondrag() { this.#gate.check("dom"); return this.#eventProperties.get("ondrag") ?? null; }
-	set ondrag(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("ondrag must be a function or null");
-		const old = this.#eventProperties.get("ondrag");
-		if (old) this.removeEventListener("drag", old);
-		if (value == null) { this.#eventProperties.delete("ondrag"); return; }
-		this.#eventProperties.set("ondrag", value);
-		this.addEventListener("drag", value);
-	}
-
-	get ondragstart() { this.#gate.check("dom"); return this.#eventProperties.get("ondragstart") ?? null; }
-	set ondragstart(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("ondragstart must be a function or null");
-		const old = this.#eventProperties.get("ondragstart");
-		if (old) this.removeEventListener("dragstart", old);
-		if (value == null) { this.#eventProperties.delete("ondragstart"); return; }
-		this.#eventProperties.set("ondragstart", value);
-		this.addEventListener("dragstart", value);
-	}
-
-	get ondragend() { this.#gate.check("dom"); return this.#eventProperties.get("ondragend") ?? null; }
-	set ondragend(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("ondragend must be a function or null");
-		const old = this.#eventProperties.get("ondragend");
-		if (old) this.removeEventListener("dragend", old);
-		if (value == null) { this.#eventProperties.delete("ondragend"); return; }
-		this.#eventProperties.set("ondragend", value);
-		this.addEventListener("dragend", value);
-	}
-
-	get ondragenter() { this.#gate.check("dom"); return this.#eventProperties.get("ondragenter") ?? null; }
-	set ondragenter(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("ondragenter must be a function or null");
-		const old = this.#eventProperties.get("ondragenter");
-		if (old) this.removeEventListener("dragenter", old);
-		if (value == null) { this.#eventProperties.delete("ondragenter"); return; }
-		this.#eventProperties.set("ondragenter", value);
-		this.addEventListener("dragenter", value);
-	}
-
-	get ondragover() { this.#gate.check("dom"); return this.#eventProperties.get("ondragover") ?? null; }
-	set ondragover(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("ondragover must be a function or null");
-		const old = this.#eventProperties.get("ondragover");
-		if (old) this.removeEventListener("dragover", old);
-		if (value == null) { this.#eventProperties.delete("ondragover"); return; }
-		this.#eventProperties.set("ondragover", value);
-		this.addEventListener("dragover", value);
-	}
-
-	get ondragleave() { this.#gate.check("dom"); return this.#eventProperties.get("ondragleave") ?? null; }
-	set ondragleave(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("ondragleave must be a function or null");
-		const old = this.#eventProperties.get("ondragleave");
-		if (old) this.removeEventListener("dragleave", old);
-		if (value == null) { this.#eventProperties.delete("ondragleave"); return; }
-		this.#eventProperties.set("ondragleave", value);
-		this.addEventListener("dragleave", value);
-	}
-
-	get ondrop() { this.#gate.check("dom"); return this.#eventProperties.get("ondrop") ?? null; }
-	set ondrop(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("ondrop must be a function or null");
-		const old = this.#eventProperties.get("ondrop");
-		if (old) this.removeEventListener("drop", old);
-		if (value == null) { this.#eventProperties.delete("ondrop"); return; }
-		this.#eventProperties.set("ondrop", value);
-		this.addEventListener("drop", value);
-	}
-
-	get oncopy() { this.#gate.check("dom"); return this.#eventProperties.get("oncopy") ?? null; }
-	set oncopy(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("oncopy must be a function or null");
-		const old = this.#eventProperties.get("oncopy");
-		if (old) this.removeEventListener("copy", old);
-		if (value == null) { this.#eventProperties.delete("oncopy"); return; }
-		this.#eventProperties.set("oncopy", value);
-		this.addEventListener("copy", value);
-	}
-
-	get oncut() { this.#gate.check("dom"); return this.#eventProperties.get("oncut") ?? null; }
-	set oncut(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("oncut must be a function or null");
-		const old = this.#eventProperties.get("oncut");
-		if (old) this.removeEventListener("cut", old);
-		if (value == null) { this.#eventProperties.delete("oncut"); return; }
-		this.#eventProperties.set("oncut", value);
-		this.addEventListener("cut", value);
-	}
-
-	get onpaste() { this.#gate.check("dom"); return this.#eventProperties.get("onpaste") ?? null; }
-	set onpaste(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onpaste must be a function or null");
-		const old = this.#eventProperties.get("onpaste");
-		if (old) this.removeEventListener("paste", old);
-		if (value == null) { this.#eventProperties.delete("onpaste"); return; }
-		this.#eventProperties.set("onpaste", value);
-		this.addEventListener("paste", value);
-	}
-
-	get onanimationstart() { this.#gate.check("dom"); return this.#eventProperties.get("onanimationstart") ?? null; }
-	set onanimationstart(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onanimationstart must be a function or null");
-		const old = this.#eventProperties.get("onanimationstart");
-		if (old) this.removeEventListener("animationstart", old);
-		if (value == null) { this.#eventProperties.delete("onanimationstart"); return; }
-		this.#eventProperties.set("onanimationstart", value);
-		this.addEventListener("animationstart", value);
-	}
-
-	get onanimationend() { this.#gate.check("dom"); return this.#eventProperties.get("onanimationend") ?? null; }
-	set onanimationend(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onanimationend must be a function or null");
-		const old = this.#eventProperties.get("onanimationend");
-		if (old) this.removeEventListener("animationend", old);
-		if (value == null) { this.#eventProperties.delete("onanimationend"); return; }
-		this.#eventProperties.set("onanimationend", value);
-		this.addEventListener("animationend", value);
-	}
-
-	get onanimationiteration() { this.#gate.check("dom"); return this.#eventProperties.get("onanimationiteration") ?? null; }
-	set onanimationiteration(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onanimationiteration must be a function or null");
-		const old = this.#eventProperties.get("onanimationiteration");
-		if (old) this.removeEventListener("animationiteration", old);
-		if (value == null) { this.#eventProperties.delete("onanimationiteration"); return; }
-		this.#eventProperties.set("onanimationiteration", value);
-		this.addEventListener("animationiteration", value);
-	}
-
-	get ontransitionend() { this.#gate.check("dom"); return this.#eventProperties.get("ontransitionend") ?? null; }
-	set ontransitionend(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("ontransitionend must be a function or null");
-		const old = this.#eventProperties.get("ontransitionend");
-		if (old) this.removeEventListener("transitionend", old);
-		if (value == null) { this.#eventProperties.delete("ontransitionend"); return; }
-		this.#eventProperties.set("ontransitionend", value);
-		this.addEventListener("transitionend", value);
-	}
-
-	get onplay() { this.#gate.check("dom"); return this.#eventProperties.get("onplay") ?? null; }
-	set onplay(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onplay must be a function or null");
-		const old = this.#eventProperties.get("onplay");
-		if (old) this.removeEventListener("play", old);
-		if (value == null) { this.#eventProperties.delete("onplay"); return; }
-		this.#eventProperties.set("onplay", value);
-		this.addEventListener("play", value);
-	}
-
-	get onpause() { this.#gate.check("dom"); return this.#eventProperties.get("onpause") ?? null; }
-	set onpause(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onpause must be a function or null");
-		const old = this.#eventProperties.get("onpause");
-		if (old) this.removeEventListener("pause", old);
-		if (value == null) { this.#eventProperties.delete("onpause"); return; }
-		this.#eventProperties.set("onpause", value);
-		this.addEventListener("pause", value);
-	}
-
-	get onended() { this.#gate.check("dom"); return this.#eventProperties.get("onended") ?? null; }
-	set onended(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onended must be a function or null");
-		const old = this.#eventProperties.get("onended");
-		if (old) this.removeEventListener("ended", old);
-		if (value == null) { this.#eventProperties.delete("onended"); return; }
-		this.#eventProperties.set("onended", value);
-		this.addEventListener("ended", value);
-	}
-
-	get ontimeupdate() { this.#gate.check("dom"); return this.#eventProperties.get("ontimeupdate") ?? null; }
-	set ontimeupdate(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("ontimeupdate must be a function or null");
-		const old = this.#eventProperties.get("ontimeupdate");
-		if (old) this.removeEventListener("timeupdate", old);
-		if (value == null) { this.#eventProperties.delete("ontimeupdate"); return; }
-		this.#eventProperties.set("ontimeupdate", value);
-		this.addEventListener("timeupdate", value);
-	}
-
-	get onvolumechange() { this.#gate.check("dom"); return this.#eventProperties.get("onvolumechange") ?? null; }
-	set onvolumechange(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onvolumechange must be a function or null");
-		const old = this.#eventProperties.get("onvolumechange");
-		if (old) this.removeEventListener("volumechange", old);
-		if (value == null) { this.#eventProperties.delete("onvolumechange"); return; }
-		this.#eventProperties.set("onvolumechange", value);
-		this.addEventListener("volumechange", value);
-	}
-
-	get oncanplay() { this.#gate.check("dom"); return this.#eventProperties.get("oncanplay") ?? null; }
-	set oncanplay(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("oncanplay must be a function or null");
-		const old = this.#eventProperties.get("oncanplay");
-		if (old) this.removeEventListener("canplay", old);
-		if (value == null) { this.#eventProperties.delete("oncanplay"); return; }
-		this.#eventProperties.set("oncanplay", value);
-		this.addEventListener("canplay", value);
-	}
-
-	get onwaiting() { this.#gate.check("dom"); return this.#eventProperties.get("onwaiting") ?? null; }
-	set onwaiting(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onwaiting must be a function or null");
-		const old = this.#eventProperties.get("onwaiting");
-		if (old) this.removeEventListener("waiting", old);
-		if (value == null) { this.#eventProperties.delete("onwaiting"); return; }
-		this.#eventProperties.set("onwaiting", value);
-		this.addEventListener("waiting", value);
-	}
-
-	get onprogress() { this.#gate.check("dom"); return this.#eventProperties.get("onprogress") ?? null; }
-	set onprogress(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onprogress must be a function or null");
-		const old = this.#eventProperties.get("onprogress");
-		if (old) this.removeEventListener("progress", old);
-		if (value == null) { this.#eventProperties.delete("onprogress"); return; }
-		this.#eventProperties.set("onprogress", value);
-		this.addEventListener("progress", value);
-	}
-
-	get oncanplaythrough() { this.#gate.check("dom"); return this.#eventProperties.get("oncanplaythrough") ?? null; }
-	set oncanplaythrough(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("oncanplaythrough must be a function or null");
-		const old = this.#eventProperties.get("oncanplaythrough");
-		if (old) this.removeEventListener("canplaythrough", old);
-		if (value == null) { this.#eventProperties.delete("oncanplaythrough"); return; }
-		this.#eventProperties.set("oncanplaythrough", value);
-		this.addEventListener("canplaythrough", value);
-	}
-
-	get onratechange() { this.#gate.check("dom"); return this.#eventProperties.get("onratechange") ?? null; }
-	set onratechange(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onratechange must be a function or null");
-		const old = this.#eventProperties.get("onratechange");
-		if (old) this.removeEventListener("ratechange", old);
-		if (value == null) { this.#eventProperties.delete("onratechange"); return; }
-		this.#eventProperties.set("onratechange", value);
-		this.addEventListener("ratechange", value);
-	}
-
-	get onseeking() { this.#gate.check("dom"); return this.#eventProperties.get("onseeking") ?? null; }
-	set onseeking(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onseeking must be a function or null");
-		const old = this.#eventProperties.get("onseeking");
-		if (old) this.removeEventListener("seeking", old);
-		if (value == null) { this.#eventProperties.delete("onseeking"); return; }
-		this.#eventProperties.set("onseeking", value);
-		this.addEventListener("seeking", value);
-	}
-
-	get onseeked() { this.#gate.check("dom"); return this.#eventProperties.get("onseeked") ?? null; }
-	set onseeked(value) {
-		this.#gate.check("dom");
-		if (value != null && typeof value !== "function") throw new TypeError("onseeked must be a function or null");
-		const old = this.#eventProperties.get("onseeked");
-		if (old) this.removeEventListener("seeked", old);
-		if (value == null) { this.#eventProperties.delete("onseeked"); return; }
-		this.#eventProperties.set("onseeked", value);
-		this.addEventListener("seeked", value);
-	}
 
 	get innerHTML() { this.#gate.check("dom"); denied("innerHTML"); }
 	set innerHTML(value) { this.#gate.check("dom"); denied("innerHTML"); }
