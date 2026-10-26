@@ -232,6 +232,7 @@ class DomBridge {
 			case "classList": return this.setClassList(target, message);
 			case "attribute": return this.setAttribute(target, message);
 			case "removeAttribute": return this.removeAttribute(target, message);
+			case "toggleAttribute": return this.toggleAttribute(target, message);
 			case "formProperty": return this.setFormProperty(target, message);
 			case "reflectedProperty": return this.setReflectedProperty(target, message);
 			case "append": return this.appendChild(target, message, ids);
@@ -345,6 +346,13 @@ class DomBridge {
 		const name = this.policy.checkAttribute(message.name, message.value);
 		if (name === "style") this.policy.checkStyle("style", message.value);
 		target.setAttribute(name, String(message.value));
+	}
+
+	toggleAttribute(target, message) {
+		this.policy.check();
+		const name = this.policy.checkAttribute(message.name, "");
+		if (typeof message.force !== "boolean") throw new TypeError("toggleAttribute force must be a boolean");
+		target.toggleAttribute(name, message.force);
 	}
 
 	removeAttribute(target, message) {
@@ -490,7 +498,7 @@ export class PpermProcess extends EventTarget {
 					snapshot = { id: 1, nodeType: 1, tagName: "BODY", idName: "", className: "", text: "", attributes: {}, styleData: {}, children: [] };
 					this.#nodeIds = new Map();
 				}
-				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-48", import.meta.url));
+				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-49", import.meta.url));
 				this.#worker.addEventListener("message", event => {
 					if (settled || this.#terminated) return;
 					const message = event.data;
