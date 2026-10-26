@@ -139,14 +139,14 @@ class PpermStyle {
 					return typeof value === "function" ? value.bind(target) : value;
 				}
 				target.#gate.check("dom");
-				const key = property.startsWith("--") ? property : property.replace(/-([a-z])/g, (_, character) => character.toUpperCase());
+				const key = property === "cssFloat" ? "float" : property.startsWith("--") ? property : property.replace(/-([a-z])/g, (_, character) => character.toUpperCase());
 				return target.#owner.styleData[key] ?? "";
 			},
 			set(target, property, value) {
 				if (typeof property === "string" && ["__proto__", "prototype", "constructor"].includes(property)) denied(property);
 				if (typeof property !== "string" || property in target) return Reflect.set(target, property, value, target);
 				target.#gate.check("dom");
-				const name = property.startsWith("--") ? property : property.replace(/[A-Z]/g, character => "-" + character.toLowerCase());
+				const name = property === "cssFloat" ? "float" : property.startsWith("--") ? property : property.replace(/[A-Z]/g, character => "-" + character.toLowerCase());
 				const cssValue = String(value);
 				const safeName = safeStyle(name, cssValue);
 				const key = safeName.startsWith("--") ? safeName : safeName.replace(/-([a-z])/g, (_, character) => character.toUpperCase());
@@ -156,9 +156,6 @@ class PpermStyle {
 			}
 		});
 	}
-
-	get cssFloat() { this.#gate.check("dom"); return this.#owner.styleData.float ?? ""; }
-	set cssFloat(value) { this.#gate.check("dom"); const text = String(value); safeStyle("float", text); this.#owner.styleData.float = text; emitMutation(this.#owner, "style", { property: "float", value: text }); }
 
 	get cssText() {
 		this.#gate.check("dom");
