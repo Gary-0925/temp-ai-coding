@@ -95,7 +95,7 @@ function serialize(data) {
 	return {
 		id: data.id, nodeType: data.nodeType, tagName: data.tagName, idName: data.idName,
 		className: data.className, text: data.text, attributes: { ...data.attributes },
-		styleData: { ...data.styleData }, value: data.value, checked: data.checked, disabled: data.disabled, muted: data.muted,
+		styleData: { ...data.styleData }, stylePriorityData: { ...(data.stylePriorityData ?? {}) }, value: data.value, checked: data.checked, disabled: data.disabled, muted: data.muted,
 		selected: data.selected, indeterminate: data.indeterminate, tabIndex: data.tabIndex, width: data.width,
 		height: data.height, rows: data.rows, cols: data.cols, maxLength: data.maxLength, minLength: data.minLength,
 		rowSpan: data.rowSpan, colSpan: data.colSpan, size: data.size, start: data.start, span: data.span,
@@ -108,7 +108,7 @@ function makeData(input = {}, parent = null) {
 		id: input.id ?? nextId++, nodeType: input.nodeType ?? 1,
 		tagName: input.tagName ?? "#text", idName: input.idName ?? "",
 		className: input.className ?? "", text: input.text ?? "",
-		attributes: { ...(input.attributes ?? {}) }, styleData: { ...(input.styleData ?? {}) },
+		attributes: { ...(input.attributes ?? {}) }, styleData: { ...(input.styleData ?? {}) }, stylePriorityData: { ...(input.stylePriorityData ?? {}) },
 		value: input.value, checked: input.checked, disabled: input.disabled, muted: input.muted, selected: input.selected,
 		indeterminate: input.indeterminate, tabIndex: input.tabIndex, width: input.width, height: input.height,
 		rows: input.rows, cols: input.cols, maxLength: input.maxLength, minLength: input.minLength,
@@ -151,6 +151,7 @@ class PpermStyle {
 				const safeName = safeStyle(name, cssValue);
 				const key = safeName.startsWith("--") ? safeName : safeName.replace(/-([a-z])/g, (_, character) => character.toUpperCase());
 				target.#owner.styleData[key] = cssValue;
+				delete target.#owner.stylePriorityData[key];
 				emitMutation(target.#owner, "style", { property: safeName, value: cssValue });
 				return true;
 			}
@@ -166,18 +167,24 @@ class PpermStyle {
 		const text = String(value);
 		safeStyle("style", text);
 		const next = {};
+		const priorities = {};
 		for (const declaration of text.split(";")) {
 			const index = declaration.indexOf(":");
 			if (index < 0) continue;
 			const name = declaration.slice(0, index).trim();
-			const valueText = declaration.slice(index + 1).trim();
+			let valueText = declaration.slice(index + 1).trim();
 			if (name) {
 				const safeName = safeStyle(name, valueText);
 				const key = safeName.startsWith("--") ? safeName : safeName.replace(/-([a-z])/g, (_, character) => character.toUpperCase());
+				if (/!\s*important\s*$/i.test(valueText)) {
+					valueText = valueText.replace(/!\s*important\s*$/i, "").trim();
+					priorities[key] = "important";
+				}
 				next[key] = valueText;
 			}
 		}
 		this.#owner.styleData = next;
+		this.#owner.stylePriorityData = priorities;
 		emitMutation(this.#owner, "styleText", { value: text });
 	}
 	get length() { this.#gate.check("dom"); return Object.keys(this.#owner.styleData).length; }
@@ -192,8 +199,12 @@ class PpermStyle {
 			throw new TypeError("CSS priority must be empty or \"important\"");
 		}
 		const key = property.startsWith("--") ? property : property.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-		if (cssValue === "") delete this.#owner.styleData[key];
-		else this.#owner.styleData[key] = cssValue;
+		if (cssValue === "") { delete this.#owner.styleData[key]; delete this.#owner.stylePriorityData[key]; }
+		else {
+			this.#owner.styleData[key] = cssValue;
+			if (cssPriority.trim().toLowerCase() === "important") this.#owner.stylePriorityData[key] = "important";
+			else delete this.#owner.stylePriorityData[key];
+		}
 		emitMutation(this.#owner, "styleSetProperty", { property, value: cssValue, priority: cssPriority });
 	}
 	getPropertyValue(name) {
@@ -202,7 +213,12 @@ class PpermStyle {
 		const key = property.startsWith("--") ? property : property.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 		return this.#owner.styleData[key] ?? "";
 	}
-	getPropertyPriority(name) { this.#gate.check("dom"); return ""; }
+	getPropertyPriority(name) {
+		this.#gate.check("dom");
+		const property = String(name);
+		const key = property.startsWith("--") ? property : property.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+		return this.#owner.stylePriorityData[key] ?? "";
+	}
 	[Symbol.iterator]() { this.#gate.check("dom"); return Array.from({ length: this.length }, (_, index) => this.item(index))[Symbol.iterator](); }
 	removeProperty(name) {
 		this.#gate.check("dom");
@@ -210,6 +226,7 @@ class PpermStyle {
 		const key = property.startsWith("--") ? property : property.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 		const oldValue = this.#owner.styleData[key] ?? "";
 		delete this.#owner.styleData[key];
+		delete this.#owner.stylePriorityData[key];
 		emitMutation(this.#owner, "styleRemoveProperty", { property });
 		return oldValue;
 	}
