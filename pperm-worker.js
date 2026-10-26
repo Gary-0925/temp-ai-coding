@@ -4,6 +4,7 @@ let root = null;
 let documentProxy = null;
 const nodes = new Map();
 const listeners = new Map();
+const nodeDataByProxy = new WeakMap();
 
 function emit(type, data = {}) {
 	if (!stopped) postMessage({ type, ...data });
@@ -77,7 +78,7 @@ function selectorMatches(node, selector) {
 }
 
 function raw(node) {
-	return node instanceof PpermNode ? node._data : node;
+	return nodeDataByProxy.get(node) ?? node;
 }
 
 function setConnected(data, connected) {
@@ -261,7 +262,7 @@ class PpermNode {
 		this._style = new PpermStyle(data, gate);
 		this._classList = new PpermTokenList(data, gate);
 		this._eventProperties = new Map();
-		return new Proxy(this, {
+		const proxy = new Proxy(this, {
 			get: (target, property) => {
 				target._gate.check("dom");
 				if (typeof property === "symbol") return Reflect.get(target, property, target);
@@ -278,6 +279,9 @@ class PpermNode {
 				return target._setProperty(property, value);
 			}
 		});
+		nodeDataByProxy.set(this, this._data);
+		nodeDataByProxy.set(proxy, this._data);
+		return proxy;
 	}
 
 	_getProperty(property) {
@@ -468,7 +472,7 @@ class PpermNode {
 		this._gate.check("dom");
 		const parent = this._data;
 		if (!(child instanceof PpermNode)) throw new TypeError("Expected a pperm Node");
-		const item = child._data;
+		const item = raw(child);
 		if (item === root) denied("moving the permitted root");
 		if (item === parent || this.contains(child)) throw new DOMException("The operation would create a cycle", "HierarchyRequestError");
 		if (before && before.parent !== parent) throw new DOMException("Reference node is not a child", "NotFoundError");
