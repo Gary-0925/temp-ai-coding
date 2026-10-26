@@ -353,10 +353,12 @@ export class PpermProcess extends EventTarget {
 							for (const item of pending) this.#attachListener(item);
 						} else if (message.type === "listen") this.#attachListener(message);
 						else if (message.type === "unlisten") {
+							this.#domBridge.policy.check();
 							for (const entry of this.#domListeners) {
 								if (entry.listenerId === message.listenerId) entry.target.removeEventListener(entry.type, entry.handler, { capture: !!entry.capture });
 							}
 							this.#domListeners = this.#domListeners.filter(entry => entry.listenerId !== message.listenerId);
+							this.#pendingListeners = this.#pendingListeners.filter(entry => entry.listenerId !== message.listenerId);
 						} else if (message.type === "documentTitle") {
 							this.#domBridge.apply({ op: "documentTitle", value: message.value }, this.#nodeIds, this.#root);
 						}
@@ -437,6 +439,10 @@ export class PpermProcess extends EventTarget {
 	}
 
 	#attachListener(message) {
+		this.#domBridge.policy.check();
+		if (!Number.isSafeInteger(message.listenerId) || typeof message.eventType !== "string" || !message.eventType || message.eventType.length > 128) {
+			throw new DOMException("Invalid DOM listener request", "NotAllowedError");
+		}
 		const target = this.#nodeIds.get(message.id);
 		if (!target) {
 			this.#pendingListeners.push(message);
