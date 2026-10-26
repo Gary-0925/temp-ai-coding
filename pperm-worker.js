@@ -116,12 +116,18 @@ class PpermStyle {
 		this.gate = gate;
 		return new Proxy(this, {
 			get: (target, property) => {
-				if (typeof property === "symbol" || property in target) return Reflect.get(target, property);
 				target.gate.check("dom");
+				if (typeof property === "symbol") return Reflect.get(target, property, target);
+				if (String(property).startsWith("_") || ["owner", "gate", "constructor", "__proto__", "prototype"].includes(String(property))) denied(String(property));
+				if (property in target) {
+					const value = Reflect.get(target, property, target);
+					return typeof value === "function" ? value.bind(target) : value;
+				}
 				return target.owner.styleData[String(property)] ?? "";
 			},
 			set: (target, property, value) => {
 				target.gate.check("dom");
+				if (String(property).startsWith("_") || ["owner", "gate", "constructor", "__proto__", "prototype"].includes(String(property))) denied(String(property));
 				const name = safeStyle(property, value);
 				target.owner.styleData[name] = String(value);
 				emitMutation(target.owner, "style", { property: name, value: String(value) });
@@ -232,9 +238,15 @@ class PpermNode {
 		this._classList = new PpermTokenList(data, gate);
 		this._eventProperties = new Map();
 		return new Proxy(this, {
-			get: (target, property, receiver) => {
-				if (typeof property === "symbol" || property in target) return Reflect.get(target, property, receiver);
+			get: (target, property) => {
 				target._gate.check("dom");
+				if (typeof property === "symbol") return Reflect.get(target, property, target);
+				const name = String(property);
+				if (name.startsWith("_") || ["constructor", "__proto__", "prototype"].includes(name)) denied(name);
+				if (property in target) {
+					const value = Reflect.get(target, property, target);
+					return typeof value === "function" ? value.bind(target) : value;
+				}
 				return target._getProperty(property);
 			},
 			set: (target, property, value) => {
@@ -324,7 +336,7 @@ class PpermNode {
 			this.addEventListener(property.slice(2).toLowerCase(), value);
 			return true;
 		}
-		if (blockedProperties.has(String(property)) || String(property).startsWith("__")) denied(String(property));
+		if (blockedProperties.has(String(property)) || String(property).startsWith("_") || ["constructor", "prototype", "__proto__"].includes(String(property))) denied(String(property));
 		if (["id", "className"].includes(property)) {
 			const name = property === "id" ? "id" : "class";
 			const text = String(value);
@@ -597,13 +609,20 @@ class PpermDocument {
 	constructor(gate) {
 		this._gate = gate;
 		return new Proxy(this, {
-			get: (target, property, receiver) => {
-				if (typeof property === "symbol" || property in target) return Reflect.get(target, property, receiver);
+			get: (target, property) => {
 				target._gate.check("dom");
+				if (typeof property === "symbol") return Reflect.get(target, property, target);
+				const name = String(property);
+				if (name.startsWith("_") || ["constructor", "__proto__", "prototype"].includes(name)) denied(name);
+				if (property in target) {
+					const value = Reflect.get(target, property, target);
+					return typeof value === "function" ? value.bind(target) : value;
+				}
 				return target._get(property);
 			},
 			set: (target, property, value) => {
 				target._gate.check("dom");
+				if (String(property).startsWith("_") || ["constructor", "__proto__", "prototype"].includes(String(property))) denied(String(property));
 				if (property === "title") { emit("documentTitle", { value: String(value) }); return true; }
 				throw new DOMException("Document property is read-only or unsupported: " + String(property), "NotSupportedError");
 			}
