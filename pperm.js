@@ -174,7 +174,7 @@ export class PpermProcess extends EventTarget {
 							finish(error);
 						}
 					} catch (error) {
-						this.dispatchEvent(new CustomEvent("error", { detail: error }));
+						finish(error);
 					}
 				});
 				this.#worker.addEventListener("error", event => {
