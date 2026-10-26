@@ -99,7 +99,7 @@ function wrap(node) {
 			if (p === "append") return (...args) => { for (const item of args) append(t, item?.__node ? raw(item) : makeText(String(item))); };
 			if (p === "prepend") return (...args) => {
 				const before = t.children[0] ?? null;
-				for (const item of [...args].reverse()) insert(t, item?.__node ? raw(item) : makeText(String(item)), before);
+				for (const item of args) insert(t, item?.__node ? raw(item) : makeText(String(item)), before);
 			};
 			if (p === "insertBefore") return (child, before) => insert(t, raw(child), before == null ? null : raw(before));
 			if (p === "replaceChild") return (child, oldChild) => {
@@ -141,7 +141,11 @@ function wrap(node) {
 				mutate("text", t, { value: t.text });
 			}
 			else if (p === "innerHTML") throw new DOMException("innerHTML is not supported; use textContent or createElement", "NotSupportedError");
-			else if (p === "value" || p === "checked" || p === "disabled" || p === "title") { t.attributes[String(p)] = String(value); mutate("property", t, { property: String(p), value }); }
+			else if (["value", "checked", "disabled", "title", "hidden", "name", "type", "href", "src", "alt", "tabIndex", "role", "draggable", "contentEditable"].includes(String(p))) {
+				t[p] = value;
+				t.attributes[String(p).toLowerCase()] = String(value);
+				mutate("property", t, { property: String(p), value });
+			}
 			else t[p] = value;
 			return true;
 		}
