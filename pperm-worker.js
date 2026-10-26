@@ -60,10 +60,14 @@ function safeAttribute(name, value) {
 }
 
 function safeStyle(property, value) {
+	property = String(property).trim();
+	if (!/^(?:--[a-z0-9_-]+|-?[a-z][a-z0-9-]*)$/i.test(property) || ["__proto__", "prototype", "constructor"].includes(property.toLowerCase())) {
+		throw new DOMException("CSS property name is not permitted", "NotAllowedError");
+	}
 	if (/url\s*\(|expression\s*\(|@import|-moz-binding|behavior\s*:|\\|\/\*/i.test(String(value))) {
 		throw new DOMException("Resource-loading CSS is not permitted", "NotAllowedError");
 	}
-	return String(property);
+	return property;
 }
 
 function selectorMatches(node, selector) {
