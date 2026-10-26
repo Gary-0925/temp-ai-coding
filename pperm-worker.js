@@ -150,6 +150,7 @@ function wrap(node) {
 			if (p === "replaceChild") return (child, oldChild) => {
 				const old = raw(oldChild);
 				if (!t.children.includes(old)) throw new DOMException("Node is not a child", "NotFoundError");
+				if (raw(child) === old) return oldChild;
 				insert(t, raw(child), old);
 				remove(t, old);
 				return oldChild;
