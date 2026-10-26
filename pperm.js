@@ -73,7 +73,12 @@ function applyDomMessage(message, ids, root) {
 		return;
 	}
 	if (message.op === "text") target.textContent = message.value;
-	else if (message.op === "style") target.style[message.property] = message.value;
+	else if (message.op === "style") {
+		if (message.property.includes("-")) {
+			if (message.value === "") target.style.removeProperty(message.property);
+			else target.style.setProperty(message.property, message.value);
+		} else target.style[message.property] = message.value;
+	}
 	else if (message.op === "attribute") target.setAttribute(message.name, String(message.value));
 	else if (message.op === "removeAttribute") target.removeAttribute(message.name);
 	else if (message.op === "property") target[message.property] = message.value;
