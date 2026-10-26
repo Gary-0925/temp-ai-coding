@@ -2,12 +2,14 @@
 	"name": "pperm.js",
 	"version": "0.1.0",
 	"type": "module",
-	"description": "A browser JavaScript runner with synchronous DOM access and configurable prototype-level capabilities.",
+	"description": "A browser JavaScript runner using dedicated Workers with a bridged DOM API and configurable capabilities.",
 	"exports": {
 		".": "./pperm.js"
 	},
 	"files": [
-		"pperm.js"
+		"pperm.js",
+		"pperm-worker.js",
+		"README.md"
 	],
 	"license": "MIT",
 	"dependencies": {
