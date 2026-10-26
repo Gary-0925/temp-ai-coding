@@ -452,6 +452,10 @@ export class PpermProcess extends EventTarget {
 					cancelable: !!nativeEvent.cancelable
 				}
 			});
+			if (message.once) {
+				target.removeEventListener(message.eventType, handler, { capture: !!message.capture });
+				this.#domListeners = this.#domListeners.filter(entry => entry.handler !== handler);
+			}
 		};
 		target.addEventListener(message.eventType, handler, { once: !!message.once, capture: !!message.capture });
 		this.#domListeners.push({ target, type: message.eventType, handler, listenerId: message.listenerId, once: !!message.once, capture: !!message.capture });
