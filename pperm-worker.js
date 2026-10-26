@@ -42,6 +42,11 @@ function query(selector, scope = root, includeScope = false) {
 	return out;
 }
 
+function setConnected(node, connected) {
+	node.connected = connected;
+	for (const child of node.children) setConnected(child, connected);
+}
+
 function serialize(node) {
 	node = raw(node);
 	return { id: node.id, nodeType: node.nodeType, tagName: node.tagName, idName: node.idName,
@@ -91,7 +96,24 @@ function wrap(node) {
 			if (p === "querySelectorAll") return selector => query(selector, t).map(wrap);
 			if (p === "closest") return selector => { let n = t; while (n) { if (matches(n, selector)) return wrap(n); n = n.parent; } return null; };
 			if (p === "appendChild") return child => append(t, raw(child));
-			if (p === "append" || p === "prepend") return (...args) => { const items = p === "prepend" ? [...args].reverse() : args; for (const item of items) append(t, item?.__node ? raw(item) : makeText(String(item))); if (p === "prepend") { /* insertion order is represented by reverse iteration */ } };
+			if (p === "append") return (...args) => { for (const item of args) append(t, item?.__node ? raw(item) : makeText(String(item))); };
+			if (p === "prepend") return (...args) => {
+				const before = t.children[0] ?? null;
+				for (const item of [...args].reverse()) insert(t, item?.__node ? raw(item) : makeText(String(item)), before);
+			};
+			if (p === "insertBefore") return (child, before) => insert(t, raw(child), before == null ? null : raw(before));
+			if (p === "replaceChild") return (child, oldChild) => {
+				const old = raw(oldChild);
+				if (!t.children.includes(old)) throw new DOMException("Node is not a child", "NotFoundError");
+				insert(t, raw(child), old);
+				remove(t, old);
+				return oldChild;
+			};
+			if (p === "before" || p === "after") return (...args) => {
+				if (!t.parent) return;
+				const before = p === "before" ? t : t.parent.children[t.parent.children.indexOf(t) + 1] ?? null;
+				for (const item of args) insert(t.parent, item?.__node ? raw(item) : makeText(String(item)), before);
+			};
 			if (p === "removeChild") return child => remove(t, raw(child));
 			if (p === "replaceChildren") return (...args) => { [...t.children].forEach(child => remove(t, child)); args.forEach(item => append(t, item?.__node ? raw(item) : makeText(String(item)))); };
 			if (p === "remove") return () => { if (t === root) throw new DOMException("Cannot remove the permitted root", "NotAllowedError"); if (t.parent) remove(t.parent, t); };
@@ -99,13 +121,25 @@ function wrap(node) {
 			if (p === "removeEventListener") return (type, callback) => { for (const [id, l] of listeners) if (l.node === t && l.type === String(type) && l.callback === callback) { listeners.delete(id); emit("unlisten", { id: t.id, listenerId: id, eventType: l.type }); } };
 			if (p === "contains") return other => { let n = raw(other); while (n) { if (n === t) return true; n = n.parent; } return false; };
 			if (p === "click" || p === "focus" || p === "blur") return () => mutate(p, t);
-			if (p === "cloneNode") return deep => { const data = serialize(t); data.id = nextId++; if (!deep) data.children = []; return wrap(build(data)); };
+			if (p === "cloneNode") return deep => {
+				const data = serialize(t);
+				const renew = item => { item.id = nextId++; if (!deep) item.children = []; else item.children.forEach(renew); };
+				renew(data);
+				const copy = build(data);
+				setConnected(copy, false);
+				return wrap(copy);
+			};
 			return undefined;
 		},
 		set(t, p, value) {
 			if (p === "id") { t.idName = String(value); t.attributes.id = t.idName; mutate("attribute", t, { name: "id", value: t.idName }); }
 			else if (p === "className") { t.className = String(value); t.attributes.class = t.className; mutate("attribute", t, { name: "class", value: t.className }); }
-			else if (p === "textContent" || p === "innerText") { t.text = String(value); t.children = []; mutate("text", t, { value: t.text }); }
+			else if (p === "textContent" || p === "innerText") {
+				for (const child of t.children) { child.parent = null; setConnected(child, false); }
+				t.children = [];
+				t.text = String(value);
+				mutate("text", t, { value: t.text });
+			}
 			else if (p === "innerHTML") throw new DOMException("innerHTML is not supported; use textContent or createElement", "NotSupportedError");
 			else if (p === "value" || p === "checked" || p === "disabled" || p === "title") { t.attributes[String(p)] = String(value); mutate("property", t, { property: String(p), value }); }
 			else t[p] = value;
@@ -125,12 +159,37 @@ function makeText(text) {
 
 function append(parent, child) {
 	if (!child?.__node) throw new TypeError("appendChild expects a pperm node");
+	if (child.nodeType === 11) {
+		for (const item of [...child.children]) append(parent, item);
+		child.children = [];
+		return wrap(child);
+	}
 	if (child === root) throw new DOMException("Cannot move the permitted root", "NotAllowedError");
 	if (child.parent) remove(child.parent, child);
 	child.parent = parent;
-	child.connected = parent.connected;
+	setConnected(child, parent.connected);
 	parent.children.push(child);
 	if (child.connected) emit("dom", { op: "append", id: parent.id, child: serialize(child) });
+	return wrap(child);
+}
+
+function insert(parent, child, before) {
+	if (!child?.__node) throw new TypeError("insertBefore expects a pperm node");
+	if (before != null && before.parent !== parent) throw new DOMException("Reference node is not a child", "NotFoundError");
+	if (child.nodeType === 11) {
+		for (const item of [...child.children]) insert(parent, item, before);
+		child.children = [];
+		return wrap(child);
+	}
+	if (child === root) throw new DOMException("Cannot move the permitted root", "NotAllowedError");
+	if (child === before) return wrap(child);
+	if (child.parent) remove(child.parent, child);
+	child.parent = parent;
+	setConnected(child, parent.connected);
+	const index = before == null ? -1 : parent.children.indexOf(before);
+	if (index < 0) parent.children.push(child);
+	else parent.children.splice(index, 0, child);
+	if (child.connected) emit("dom", { op: "insert", id: parent.id, child: serialize(child), beforeId: before?.id ?? null });
 	return wrap(child);
 }
 
@@ -140,7 +199,7 @@ function remove(parent, child) {
 	if (child === root) throw new DOMException("Cannot remove the permitted root", "NotAllowedError");
 	parent.children.splice(i, 1);
 	child.parent = null;
-	child.connected = false;
+	setConnected(child, false);
 	if (parent.connected) emit("dom", { op: "remove", id: parent.id, childId: child.id });
 	return wrap(child);
 }
@@ -156,7 +215,7 @@ const documentProxy = new Proxy({}, {
 		if (p === "createElement") return tag => { const n = build({ id: nextId++, tagName: String(tag).toUpperCase() }); n.connected = false; return wrap(n); };
 		if (p === "createTextNode") return text => wrap(makeText(String(text)));
 		if (p === "createComment") return text => { const n = makeText(String(text)); n.nodeType = 8; n.tagName = "#comment"; return wrap(n); };
-		if (p === "createDocumentFragment") return () => { const n = build({ id: nextId++, nodeType: 11, tagName: "#fragment" }); n.connected = false; return wrap(n); };
+		if (p === "createDocumentFragment") { const n = build({ id: nextId++, nodeType: 11, tagName: "#fragment" }); setConnected(n, false); return wrap(n); }
 		if (p === "nodeType") return 9;
 		if (p === "addEventListener" || p === "removeEventListener") return wrap(root)[p];
 		return undefined;
