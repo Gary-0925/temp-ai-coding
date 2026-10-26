@@ -929,10 +929,15 @@ class PpermNode {
 	get baseURI() { this.#gate.check("dom"); return documentProxy?.baseURI ?? ""; }
 	get isContentEditable() {
 		this.#gate.check("dom");
-		const value = String(this.#data.attributes.contenteditable ?? "").toLowerCase();
-		return value === "" || value === "true" || value === "plaintext-only";
+		for (let node = this.#data; node; node = node.parent) {
+			if (!Object.hasOwn(node.attributes, "contenteditable")) continue;
+			const value = String(node.attributes.contenteditable).toLowerCase();
+			if (value === "false") return false;
+			if (value === "" || value === "true" || value === "plaintext-only") return true;
+		}
+		return false;
 	}
-	get offsetParent() { this.#gate.check("dom"); return null; }
+	get offsetParent() { this.#gate.check("dom"); throw new DOMException("Layout measurements are asynchronous across the Worker bridge and are not supported yet", "NotSupportedError"); }
 	get offsetWidth() { this.#gate.check("dom"); throw new DOMException("Layout measurements are asynchronous across the Worker bridge and are not supported yet", "NotSupportedError"); }
 	get offsetHeight() { this.#gate.check("dom"); throw new DOMException("Layout measurements are asynchronous across the Worker bridge and are not supported yet", "NotSupportedError"); }
 	get offsetTop() { this.#gate.check("dom"); throw new DOMException("Layout measurements are asynchronous across the Worker bridge and are not supported yet", "NotSupportedError"); }
