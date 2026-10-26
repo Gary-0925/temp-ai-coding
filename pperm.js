@@ -1,25 +1,16 @@
-import * as acorn from "acorn";
-
 const defaults = {
 	network: { fetch: true, webSocket: true, eventSource: true, xmlHttpRequest: true },
 	storage: { indexedDB: true, cache: true },
 	dom: { enabled: false, root: "body" }
 };
 
-const guardedName = "__ppermInternalCheck_7d3a";
-
 function normalizePermissions(permissions = {}) {
 	const network = permissions.network ?? {};
 	const storage = permissions.storage ?? {};
 	const dom = permissions.dom ?? {};
-
 	return {
-		network: Object.fromEntries(
-			Object.keys(defaults.network).map(key => [key, network[key] ?? defaults.network[key]])
-		),
-		storage: Object.fromEntries(
-			Object.keys(defaults.storage).map(key => [key, storage[key] ?? defaults.storage[key]])
-		),
+		network: Object.fromEntries(Object.keys(defaults.network).map(key => [key, network[key] ?? defaults.network[key]])),
+		storage: Object.fromEntries(Object.keys(defaults.storage).map(key => [key, storage[key] ?? defaults.storage[key]])),
 		dom: {
 			enabled: dom.enabled ?? defaults.dom.enabled,
 			root: typeof dom.root === "string" ? dom.root : defaults.dom.root
@@ -27,349 +18,87 @@ function normalizePermissions(permissions = {}) {
 	};
 }
 
-function deny(name) {
-	return new Proxy(function() {
-		throw new DOMException(name + " is not permitted", "NotAllowedError");
-	}, {
-		construct() {
-			throw new DOMException(name + " is not permitted", "NotAllowedError");
-		}
-	});
-}
-
-function instrumentStatements(source) {
-	const ast = acorn.parse(source, {
-		ecmaVersion: "latest",
-		sourceType: "script",
-		allowReturnOutsideFunction: true,
-		allowAwaitOutsideFunction: true
-	});
-	const edits = [];
-	const seen = new Set();
-
-	function add(position, replacement) {
-		edits.push([position, position, replacement]);
+function snapshotNode(node, ids, state) {
+	const id = state.nextId++;
+	ids.set(id, node);
+	const attributes = {};
+	if (node.nodeType === 1) {
+		for (const attr of node.attributes) attributes[attr.name] = attr.value;
 	}
-
-	function walk(node, parent = null, parentKey = "") {
-		if (!node || typeof node.type !== "string") return;
-
-		if (node.type === "BlockStatement" || node.type === "StaticBlock") {
-			let position = node.start + 1;
-			if (node.type === "BlockStatement") {
-				for (const statement of node.body) {
-					if (!statement.directive) break;
-					position = statement.end;
-				}
-			}
-			add(position, (position === node.start + 1 ? "" : ";") + guardedName + "();");
-		} else {
-			const isStatement = node.type.endsWith("Statement")
-				|| node.type === "FunctionDeclaration"
-				|| node.type === "ClassDeclaration"
-				|| node.type === "VariableDeclaration" && !(
-					parent && ["ForStatement", "ForInStatement", "ForOfStatement"].includes(parent.type)
-				);
-			if (isStatement && !node.directive) {
-				const isLabeledBody = parent?.type === "LabeledStatement" && parentKey === "body";
-				const isLabeledIteration = isLabeledBody && [
-					"ForStatement", "ForInStatement", "ForOfStatement", "WhileStatement", "DoWhileStatement"
-				].includes(node.type);
-				const isControlStatement = parent && [
-					"IfStatement", "ForStatement", "ForInStatement", "ForOfStatement",
-					"WhileStatement", "DoWhileStatement", "WithStatement"
-				].includes(parent.type);
-				const isControlledBody = isControlStatement
-					&& ["consequent", "alternate", "body"].includes(parentKey);
-				if (isLabeledIteration) {
-					// Keep labels attached to loop statements so continue label remains valid.
-				} else if (isControlledBody || isLabeledBody) {
-					add(node.start, "{" + guardedName + "();");
-					add(node.end, "}");
-				} else if (!seen.has(node.start)) {
-					add(node.start, guardedName + "();");
-					seen.add(node.start);
-				}
-			}
-		}
-
-		for (const key of Object.keys(node)) {
-			if (key === "start" || key === "end" || key === "loc") continue;
-			const value = node[key];
-			if (Array.isArray(value)) {
-				for (const child of value) walk(child, node, key);
-			} else if (value && typeof value.type === "string") {
-				walk(value, node, key);
-			}
+	const styleData = {};
+	if (node.nodeType === 1) {
+		for (let i = 0; i < node.style.length; i++) {
+			const name = node.style[i];
+			styleData[name.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = node.style.getPropertyValue(name);
 		}
 	}
-
-	walk(ast);
-	edits.sort((a, b) => b[0] - a[0]);
-	for (const [start, end, replacement] of edits) {
-		source = source.slice(0, start) + replacement + source.slice(end);
-	}
-	return source;
-}
-
-function createProcessDocument(root, check) {
-	const proxyCache = new WeakMap();
-	const rawByProxy = new WeakMap();
-	const createdNodes = new WeakSet();
-	const listeners = new Set();
-	let terminated = false;
-
-	const assertActive = () => {
-		check();
-		if (terminated) throw new DOMException("Process has been terminated", "AbortError");
-	};
-	const allowed = node => !!node && (node === root || root.contains(node) || (!node.isConnected && createdNodes.has(node)));
-	const unwrap = value => rawByProxy.get(value) ?? value;
-	const ensureNode = node => {
-		if (!(node instanceof Node)) return node;
-		if (!allowed(node)) throw new DOMException("DOM node is outside the permitted root", "NotAllowedError");
-		return node;
-	};
-	const wrapValue = value => {
-		if (value instanceof Node) return wrapNode(value);
-		if (value instanceof NodeList || value instanceof HTMLCollection) return Array.from(value, wrapValue);
-		if (Array.isArray(value)) return value.map(wrapValue);
-		return value;
-	};
-	const isRoot = node => node === root;
-
-	function wrapNode(node) {
-		if (!node) return null;
-		if (!allowed(node)) return null;
-		if (proxyCache.has(node)) return proxyCache.get(node);
-
-		const proxy = new Proxy(node, {
-			get(target, property) {
-				assertActive();
-				if (property === "ownerDocument") return documentProxy;
-				if (property === "parentNode" || property === "parentElement") {
-					const parent = property === "parentNode" ? target.parentNode : target.parentElement;
-					return !parent || isRoot(target) || !allowed(parent) ? null : wrapNode(parent);
-				}
-				if (property === "getRootNode") return () => wrapNode(root);
-				if (property === "outerHTML") throw new DOMException("outerHTML is not permitted", "NotAllowedError");
-				if (property === "remove" && isRoot(target)) return () => { throw new DOMException("The permitted DOM root cannot be removed", "NotAllowedError"); };
-				if (property === "before" || property === "after" || property === "replaceWith") {
-					if (isRoot(target)) return () => { throw new DOMException("The permitted DOM root cannot be moved or replaced", "NotAllowedError"); };
-				}
-				if (property === "insertAdjacentHTML" || property === "insertAdjacentElement" || property === "insertAdjacentText") {
-					return (position, ...args) => {
-						assertActive();
-						const where = String(position).toLowerCase();
-						if (isRoot(target) && (where === "beforebegin" || where === "afterend")) {
-							throw new DOMException("Content cannot be inserted outside the permitted DOM root", "NotAllowedError");
-						}
-						if (property === "insertAdjacentElement" && args[0]) args[0] = ensureNode(unwrap(args[0]));
-						return target[property](position, ...args);
-					};
-				}
-				if (property === "addEventListener") {
-					return (type, callback, options) => {
-						assertActive();
-						if (typeof callback !== "function" && (!callback || typeof callback.handleEvent !== "function")) return;
-						const wrapped = function(event) {
-							if (terminated) return;
-							const eventProxy = new Proxy(event, {
-								get(eventTarget, key) {
-									if (key === "target" || key === "currentTarget" || key === "srcElement") return wrapNode(eventTarget[key]);
-									const value = Reflect.get(eventTarget, key, eventTarget);
-									return typeof value === "function" ? value.bind(eventTarget) : value;
-								}
-							});
-							const result = typeof callback === "function"
-								? callback.call(proxy, eventProxy)
-								: callback.handleEvent.call(callback, eventProxy);
-							if (options && typeof options === "object" && options.once) listeners.delete(entry);
-							return result;
-						};
-						const entry = { target, type, callback, wrapped, options };
-						listeners.add(entry);
-						target.addEventListener(type, wrapped, options);
-					};
-				}
-				if (property === "removeEventListener") {
-					return (type, callback, options) => {
-						for (const entry of listeners) {
-							if (entry.target === target && entry.type === type && entry.callback === callback) {
-								target.removeEventListener(type, entry.wrapped, options ?? entry.options);
-								listeners.delete(entry);
-							}
-						}
-					};
-				}
-				if (property === "contains") return other => {
-					const nodeArg = unwrap(other);
-					return nodeArg instanceof Node && allowed(nodeArg) && target.contains(nodeArg);
-				};
-				if (property === "appendChild" || property === "insertBefore" || property === "replaceChild") {
-					return (...args) => {
-						assertActive();
-						const node = ensureNode(unwrap(args[0]));
-						if (args.length > 1 && args[1] != null) args[1] = ensureNode(unwrap(args[1]));
-						if (isRoot(node) || (args[1] && isRoot(args[1]))) {
-							throw new DOMException("The permitted DOM root cannot be moved", "NotAllowedError");
-						}
-						const result = target[property](node, ...args.slice(1));
-						return wrapValue(result);
-					};
-				}
-				if (["append", "prepend", "replaceChildren", "before", "after", "replaceWith"].includes(property)) {
-					return (...args) => {
-						assertActive();
-						const nodes = args.map(arg => {
-							const value = unwrap(arg);
-							if (value instanceof Node) return ensureNode(value);
-							return value;
-						});
-						if (nodes.some(isRoot)) throw new DOMException("The permitted DOM root cannot be moved", "NotAllowedError");
-						target[property](...nodes);
-					};
-				}
-				if (property === "cloneNode") {
-					return (...args) => {
-						const clone = target.cloneNode(...args);
-						const register = current => {
-							createdNodes.add(current);
-							for (const child of current.childNodes) register(child);
-						};
-						register(clone);
-						return wrapNode(clone);
-					};
-				}
-				if (property === "closest") return selector => {
-					const result = target.closest(selector);
-					return result && allowed(result) ? wrapNode(result) : null;
-				};
-				const value = Reflect.get(target, property, target);
-				if (typeof value === "function") {
-					return (...args) => {
-						assertActive();
-						const nativeArgs = args.map(arg => {
-							const value = unwrap(arg);
-							return value instanceof Node ? ensureNode(value) : value;
-						});
-						const result = value.apply(target, nativeArgs);
-						return wrapValue(result);
-					};
-				}
-				return wrapValue(value);
-			},
-			set(target, property, value) {
-				assertActive();
-				if (property === "outerHTML" || ["ownerDocument", "parentNode", "parentElement"].includes(property)) {
-					throw new DOMException("This DOM property is not permitted", "NotAllowedError");
-				}
-				const raw = unwrap(value);
-				if (raw instanceof Node) ensureNode(raw);
-				Reflect.set(target, property, raw, target);
-				return true;
-			},
-			has(target, property) {
-				return property in target;
-			}
-		});
-		proxyCache.set(node, proxy);
-		rawByProxy.set(proxy, node);
-		return proxy;
-	}
-
-	function querySelector(selector, scope = root) {
-		const text = String(selector);
-		if (scope.matches && scope.matches(text)) return wrapNode(scope);
-		return wrapNode(scope.querySelector(text));
-	}
-
-	const documentProxy = new Proxy(Object.create(null), {
-		get(_, property) {
-			assertActive();
-			if (property === "body" || property === "documentElement") return wrapNode(root);
-			if (property === "querySelector") return selector => querySelector(selector);
-			if (property === "querySelectorAll") return selector => {
-				const text = String(selector);
-				const result = [];
-				if (root.matches && root.matches(text)) result.push(wrapNode(root));
-				result.push(...Array.from(root.querySelectorAll(text), wrapNode));
-				return result;
-			};
-			if (property === "getElementById") return id => {
-				const text = String(id);
-				return root.id === text ? wrapNode(root) : wrapNode(Array.from(root.querySelectorAll("[id]")).find(node => node.id === text) ?? null);
-			};
-			if (property === "getElementsByClassName") return name => {
-				const result = [];
-				if (root.classList.contains(String(name))) result.push(wrapNode(root));
-				result.push(...Array.from(root.getElementsByClassName(String(name)), wrapNode));
-				return result;
-			};
-			if (property === "getElementsByTagName") return name => {
-				const result = [];
-				if (root.tagName?.toLowerCase() === String(name).toLowerCase() || name === "*") result.push(wrapNode(root));
-				result.push(...Array.from(root.getElementsByTagName(String(name)), wrapNode));
-				return result;
-			};
-			if (property === "createElement") return tag => {
-				const node = window.document.createElement(String(tag));
-				createdNodes.add(node);
-				return wrapNode(node);
-			};
-			if (property === "createTextNode") return text => {
-				const node = window.document.createTextNode(String(text));
-				createdNodes.add(node);
-				return wrapNode(node);
-			};
-			if (property === "createComment") return text => {
-				const node = window.document.createComment(String(text));
-				createdNodes.add(node);
-				return wrapNode(node);
-			};
-			if (property === "createDocumentFragment") return () => {
-				const node = window.document.createDocumentFragment();
-				createdNodes.add(node);
-				return wrapNode(node);
-			};
-			if (property === "addEventListener") return wrapNode(root).addEventListener;
-			if (property === "removeEventListener") return wrapNode(root).removeEventListener;
-			if (property === "title") return window.document.title;
-			if (property === "URL" || property === "documentURI") return window.location.href;
-			if (property === "readyState") return window.document.readyState;
-			if (property === "visibilityState") return window.document.visibilityState;
-			if (property === "activeElement") return wrapNode(window.document.activeElement);
-			if (property === "nodeType") return 9;
-			if (property === "toString") return () => "[object Document]";
-			return undefined;
-		},
-		set(_, property, value) {
-			assertActive();
-			if (property === "title") {
-				window.document.title = String(value);
-				return true;
-			}
-			throw new DOMException("This document property is read-only or unsupported", "NotAllowedError");
-		}
-	});
-
 	return {
-		document: documentProxy,
-		terminate() {
-			terminated = true;
-			for (const entry of listeners) entry.target.removeEventListener(entry.type, entry.wrapped, entry.options);
-			listeners.clear();
-		}
+		id,
+		nodeType: node.nodeType,
+		tagName: node.nodeType === 1 ? node.tagName : node.nodeName,
+		idName: node.nodeType === 1 ? node.id : "",
+		className: node.nodeType === 1 ? node.className : "",
+		text: node.nodeType === 3 || node.nodeType === 8 ? node.nodeValue ?? "" : "",
+		attributes,
+		styleData,
+		children: Array.from(node.childNodes, child => snapshotNode(child, ids, state))
 	};
+}
+
+function createNativeNode(data, ids) {
+	let node;
+	if (data.nodeType === 3) node = document.createTextNode(data.text ?? "");
+	else if (data.nodeType === 8) node = document.createComment(data.text ?? "");
+	else if (data.nodeType === 11) node = document.createDocumentFragment();
+	else {
+		node = document.createElement(String(data.tagName ?? "div").toLowerCase());
+		for (const [name, value] of Object.entries(data.attributes ?? {})) {
+			try { node.setAttribute(name, String(value)); } catch {}
+		}
+		for (const [name, value] of Object.entries(data.styleData ?? {})) {
+			try { node.style[name] = String(value); } catch {}
+		}
+		if (data.text) node.textContent = data.text;
+	}
+	ids.set(data.id, node);
+	for (const child of data.children ?? []) node.appendChild(createNativeNode(child, ids));
+	return node;
+}
+
+function applyDomMessage(message, ids, root) {
+	const target = ids.get(message.id);
+	if (!target) throw new DOMException("Unknown DOM bridge node", "NotFoundError");
+	if (message.op === "documentTitle") {
+		document.title = message.value;
+		return;
+	}
+	if (message.op === "text") target.textContent = message.value;
+	else if (message.op === "style") target.style[message.property] = message.value;
+	else if (message.op === "attribute") target.setAttribute(message.name, String(message.value));
+	else if (message.op === "removeAttribute") target.removeAttribute(message.name);
+	else if (message.op === "property") target[message.property] = message.value;
+	else if (message.op === "append") target.appendChild(createNativeNode(message.child, ids));
+	else if (message.op === "insert") {
+		const before = ids.get(message.beforeId) ?? null;
+		target.insertBefore(createNativeNode(message.child, ids), before);
+	}
+	else if (message.op === "remove") {
+		const child = ids.get(message.childId);
+		if (child?.parentNode === target && child !== root) target.removeChild(child);
+	}
+	else if (message.op === "click" || message.op === "focus" || message.op === "blur") target[message.op]();
 }
 
 export class PpermProcess extends EventTarget {
 	#terminated = false;
-	#active = new Set();
-	#runtime;
-	#maxExecutionTimeMs;
-	#terminationPromise;
+	#worker = null;
+	#timer = null;
 	#resolveTermination;
+	#terminationPromise;
+	#running = false;
+	#maxExecutionTimeMs;
+	#root = null;
+	#nodeIds = new Map();
 
 	constructor(options = {}) {
 		super();
@@ -377,110 +106,132 @@ export class PpermProcess extends EventTarget {
 		this.permissions = Object.freeze(normalizePermissions(permissions));
 		this.#maxExecutionTimeMs = Math.max(1, Number(options.maxExecutionTimeMs) || 10000);
 		this.#terminationPromise = new Promise(resolve => { this.#resolveTermination = resolve; });
-		let root = null;
 		if (this.permissions.dom.enabled) {
-			root = window.document.querySelector(this.permissions.dom.root);
-			if (!root) throw new Error("DOM root not found: " + this.permissions.dom.root);
+			this.#root = document.querySelector(this.permissions.dom.root);
+			if (!this.#root) throw new Error("DOM root not found: " + this.permissions.dom.root);
 		}
-		const check = () => {
-			if (this.#terminated) throw new DOMException("Process has been terminated", "AbortError");
-		};
-		this.#runtime = root ? createProcessDocument(root, check) : null;
 	}
 
+	run(code) {
+		if (this.#terminated) return Promise.reject(new DOMException("Process has been terminated", "AbortError"));
+		if (this.#running) return Promise.reject(new Error("A pperm process can run only one script at a time"));
+		this.#running = true;
 
-	async run(code) {
-		if (this.#terminated) throw new Error("Process has been terminated");
-		const timeoutError = new DOMException("Execution stopped: time limit exceeded", "TimeoutError");
-		let timedOut = false;
-		let deadline;
-		const check = () => {
-			if (timedOut) throw timeoutError;
-			if (this.#terminated) throw new DOMException("Process has been terminated", "AbortError");
-			if (deadline !== undefined && performance.now() >= deadline) {
-				timedOut = true;
-				this.terminate();
-				throw timeoutError;
+		return new Promise((resolve, reject) => {
+			let settled = false;
+			let snapshot;
+			const finish = (error, value) => {
+				if (settled) return;
+				settled = true;
+				clearTimeout(this.#timer);
+				this.#timer = null;
+				this.#worker?.terminate();
+				this.#worker = null;
+				this.#running = false;
+				if (error) {
+					this.dispatchEvent(new CustomEvent("error", { detail: error }));
+					reject(error);
+				} else resolve(value);
+			};
+			this.#finish = finish;
+			if (this.#terminated) {
+				finish(new DOMException("Process has been terminated", "AbortError"));
+				return;
 			}
-		};
-		const instrumented = instrumentStatements(String(code));
-		const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
-		const execute = new AsyncFunction(
-			"postMessage", "permissions", "document", guardedName,
-			"fetch", "WebSocket", "EventSource", "XMLHttpRequest", "indexedDB", "caches",
-			instrumented
-		);
-		const denyIf = (allowed, name, value) => allowed ? value : deny(name);
-		const network = this.permissions.network;
-		const storage = this.permissions.storage;
-		const context = {
-			postMessage: value => {
-				if (this.#terminated) return;
-				this.dispatchEvent(new CustomEvent("message", { detail: value }));
-			},
-			permissions: this.permissions,
-			document: this.permissions.dom.enabled ? this.#runtime.document : undefined,
-			check,
-			network,
-			storage
-		};
-		let timeoutHandle;
-		const timeout = new Promise((_, reject) => {
-			timeoutHandle = setTimeout(() => {
-				timedOut = true;
-				this.terminate();
-				reject(timeoutError);
-			}, this.#maxExecutionTimeMs);
+
+			try {
+				if (this.#root) {
+					this.#nodeIds = new Map();
+					snapshot = snapshotNode(this.#root, this.#nodeIds, { nextId: 1 });
+				} else {
+					snapshot = { id: 1, nodeType: 1, tagName: "BODY", idName: "", className: "", text: "", attributes: {}, styleData: {}, children: [] };
+					this.#nodeIds = new Map();
+				}
+				this.#worker = new Worker(new URL("./pperm-worker.js", import.meta.url));
+				this.#worker.addEventListener("message", event => {
+					if (settled || this.#terminated) return;
+					const message = event.data;
+					try {
+						if (message.type === "userMessage") this.dispatchEvent(new CustomEvent("message", { detail: message.value }));
+						else if (message.type === "dom") {
+							if (!this.#root) throw new DOMException("DOM permission is not enabled", "NotAllowedError");
+							applyDomMessage(message, this.#nodeIds, this.#root);
+						} else if (message.type === "listen") {
+							const target = this.#nodeIds.get(message.id);
+							if (!target) return;
+							const handler = nativeEvent => {
+								if (this.#terminated || !this.#worker) return;
+								this.#worker.postMessage({
+									type: "event",
+									listenerId: message.listenerId,
+									event: { type: nativeEvent.type, detail: nativeEvent.detail ?? null }
+								});
+								if (message.once) target.removeEventListener(message.eventType, handler);
+							};
+							target.addEventListener(message.eventType, handler, { once: !!message.once });
+							this.#domListeners.push({ target, type: message.eventType, handler });
+						} else if (message.type === "unlisten") {
+							for (const entry of this.#domListeners) {
+								if (entry.target === this.#nodeIds.get(message.id) && entry.type === message.eventType) {
+									entry.target.removeEventListener(entry.type, entry.handler);
+								}
+							}
+						} else if (message.type === "documentTitle") document.title = message.value;
+						else if (message.type === "done") finish(null, message.value);
+						else if (message.type === "error") {
+							const error = new Error(message.error?.message ?? "Worker execution failed");
+							error.name = message.error?.name ?? "Error";
+							if (message.error?.stack) error.stack = message.error.stack;
+							finish(error);
+						}
+					} catch (error) {
+						this.dispatchEvent(new CustomEvent("error", { detail: error }));
+					}
+				});
+				this.#worker.addEventListener("error", event => {
+					event.preventDefault();
+					const error = new Error(event.message || "Worker failed");
+					error.name = "WorkerError";
+					finish(error);
+				});
+				this.#worker.postMessage({
+					type: "init",
+					code: String(code),
+					permissions: this.permissions,
+					snapshot
+				});
+				this.#timer = setTimeout(() => {
+					const error = new DOMException("Execution stopped: time limit exceeded", "TimeoutError");
+					this.terminate();
+					finish(error);
+				}, this.#maxExecutionTimeMs);
+			} catch (error) {
+				finish(error);
+			}
 		});
-		deadline = performance.now() + this.#maxExecutionTimeMs;
-		let active;
-		try {
-			active = execute(
-				context.postMessage,
-				context.permissions,
-				context.document,
-				check,
-				denyIf(network.fetch, "fetch", window.fetch.bind(window)),
-				denyIf(network.webSocket, "WebSocket", window.WebSocket),
-				denyIf(network.eventSource, "EventSource", window.EventSource),
-				denyIf(network.xmlHttpRequest, "XMLHttpRequest", window.XMLHttpRequest),
-				denyIf(storage.indexedDB, "indexedDB", window.indexedDB),
-				denyIf(storage.cache, "caches", window.caches)
-			);
-		} catch (error) {
-			clearTimeout(timeoutHandle);
-			throw error;
-		}
-		this.#active.add(active);
-		try {
-			const result = await Promise.race([
-				active,
-				timeout,
-				this.#terminationPromise.then(() => {
-					throw timedOut ? timeoutError : new DOMException("Process has been terminated", "AbortError");
-				})
-			]);
-			if (this.#terminated) throw new DOMException("Process has been terminated", "AbortError");
-			return result;
-		} catch (error) {
-			this.dispatchEvent(new CustomEvent("error", { detail: error }));
-			throw error;
-		} finally {
-			clearTimeout(timeoutHandle);
-			this.#active.delete(active);
-		}
 	}
+
+	#domListeners = [];
 
 	postMessage(value) {
-		if (this.#terminated) throw new Error("Process has been terminated");
+		if (this.#terminated) throw new DOMException("Process has been terminated", "AbortError");
 		this.dispatchEvent(new CustomEvent("message", { detail: value }));
 	}
 
 	terminate() {
 		if (this.#terminated) return;
 		this.#terminated = true;
+		clearTimeout(this.#timer);
+		this.#timer = null;
+		this.#worker?.postMessage({ type: "shutdown" });
+		this.#worker?.terminate();
+		this.#worker = null;
+		for (const entry of this.#domListeners) {
+			entry.target.removeEventListener(entry.type, entry.handler);
+		}
+		this.#domListeners = [];
 		this.#resolveTermination();
-		this.#runtime?.terminate();
+		this.#finish?.(new DOMException("Process has been terminated", "AbortError"));
 		this.dispatchEvent(new Event("terminate"));
 	}
 
