@@ -68,11 +68,15 @@ function assertSafeProperty(name, value) {
 }
 
 function assertSafeStyle(property, value) {
+	property = String(property).trim();
 	const css = String(value);
+	if (!/^(?:--[a-z0-9_-]+|-?[a-z][a-z0-9-]*)$/i.test(property) || ["__proto__", "prototype", "constructor"].includes(property.toLowerCase())) {
+		throw new DOMException("CSS property name is not permitted by the DOM bridge", "NotAllowedError");
+	}
 	if (/url\s*\(|expression\s*\(|@import|-moz-binding|behavior\s*:|\\|\/\*/i.test(css)) {
 		throw new DOMException("CSS resource loading and executable CSS are not permitted by the DOM bridge", "NotAllowedError");
 	}
-	return String(property);
+	return property;
 }
 
 function snapshotNode(node, ids, state) {
@@ -340,7 +344,7 @@ export class PpermProcess extends EventTarget {
 					snapshot = { id: 1, nodeType: 1, tagName: "BODY", idName: "", className: "", text: "", attributes: {}, styleData: {}, children: [] };
 					this.#nodeIds = new Map();
 				}
-				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-20", import.meta.url));
+				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-21", import.meta.url));
 				this.#worker.addEventListener("message", event => {
 					if (settled || this.#terminated) return;
 					const message = event.data;
