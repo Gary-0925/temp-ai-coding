@@ -8,6 +8,35 @@ const defaults = {
 
 const guardedName = "__ppermInternalCheck_7d3a";
 
+function normalizePermissions(permissions = {}) {
+	const network = permissions.network ?? {};
+	const storage = permissions.storage ?? {};
+	const dom = permissions.dom ?? {};
+
+	return {
+		network: Object.fromEntries(
+			Object.keys(defaults.network).map(key => [key, network[key] ?? defaults.network[key]])
+		),
+		storage: Object.fromEntries(
+			Object.keys(defaults.storage).map(key => [key, storage[key] ?? defaults.storage[key]])
+		),
+		dom: {
+			enabled: dom.enabled ?? defaults.dom.enabled,
+			root: typeof dom.root === "string" ? dom.root : defaults.dom.root
+		}
+	};
+}
+
+function deny(name) {
+	return new Proxy(function() {
+		throw new DOMException(name + " is not permitted", "NotAllowedError");
+	}, {
+		construct() {
+			throw new DOMException(name + " is not permitted", "NotAllowedError");
+		}
+	});
+}
+
 function instrumentStatements(source) {
 	const ast = acorn.parse(source, {
 		ecmaVersion: "latest",
