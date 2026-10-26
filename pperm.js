@@ -221,6 +221,9 @@ class DomBridge {
 			case "documentTitle": return this.setDocumentTitle(message);
 			case "text": return this.setText(target, message);
 			case "style": return this.setStyle(target, message);
+			case "styleText": return this.setStyleText(target, message);
+			case "styleSetProperty": return this.setStyleProperty(target, message);
+			case "styleRemoveProperty": return this.removeStyleProperty(target, message);
 			case "attribute": return this.setAttribute(target, message);
 			case "removeAttribute": return this.removeAttribute(target, message);
 			case "property": return this.setProperty(target, message);
@@ -250,6 +253,30 @@ class DomBridge {
 			if (message.value === "") target.style.removeProperty(property);
 			else target.style.setProperty(property, String(message.value), message.priority ?? "");
 		} else target.style[property] = String(message.value);
+	}
+
+	setStyleText(target, message) {
+		this.policy.check();
+		const value = String(message.value);
+		this.policy.checkStyle("style", value);
+		target.style.cssText = value;
+	}
+
+	setStyleProperty(target, message) {
+		this.policy.check();
+		const value = String(message.value);
+		const property = this.policy.checkStyle(message.property, value);
+		const priority = String(message.priority ?? "");
+		if (priority.trim() && priority.trim().toLowerCase() !== "important") {
+			throw new TypeError("CSS priority must be empty or \"important\"");
+		}
+		target.style.setProperty(property, value, priority);
+	}
+
+	removeStyleProperty(target, message) {
+		this.policy.check();
+		const property = this.policy.checkStyle(message.property, "");
+		target.style.removeProperty(property);
 	}
 
 	setAttribute(target, message) {
@@ -380,7 +407,7 @@ export class PpermProcess extends EventTarget {
 					snapshot = { id: 1, nodeType: 1, tagName: "BODY", idName: "", className: "", text: "", attributes: {}, styleData: {}, children: [] };
 					this.#nodeIds = new Map();
 				}
-				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-35", import.meta.url));
+				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-36", import.meta.url));
 				this.#worker.addEventListener("message", event => {
 					if (settled || this.#terminated) return;
 					const message = event.data;
