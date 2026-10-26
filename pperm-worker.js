@@ -708,9 +708,12 @@ class PpermNode {
 		if (!/^[a-z_:][a-z0-9_.:-]*$/.test(safeName) || safeName.startsWith("on") || blockedAttributes.has(safeName)) denied("attribute " + safeName);
 		const present = Object.hasOwn(this.#data.attributes, safeName);
 		const shouldHave = force === undefined ? !present : Boolean(force);
-		if (shouldHave) {
-			if (!present) this.setAttribute(safeName, "");
-		} else if (present) this.removeAttribute(safeName);
+		if (shouldHave === present) return shouldHave;
+		if (shouldHave) this.#data.attributes[safeName] = "";
+		else delete this.#data.attributes[safeName];
+		if (safeName === "id") this.#data.idName = shouldHave ? "" : "";
+		if (safeName === "class") this.#data.className = shouldHave ? "" : "";
+		emitMutation(this.#data, "toggleAttribute", { name: safeName, force: shouldHave });
 		return shouldHave;
 	}
 
