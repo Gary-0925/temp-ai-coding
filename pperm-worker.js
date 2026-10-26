@@ -165,7 +165,19 @@ class PpermStyle {
 		this.#gate.check("dom");
 		const text = String(value);
 		safeStyle("style", text);
-		this.#owner.styleData = {};
+		const next = {};
+		for (const declaration of text.split(";")) {
+			const index = declaration.indexOf(":");
+			if (index < 0) continue;
+			const name = declaration.slice(0, index).trim();
+			const valueText = declaration.slice(index + 1).trim();
+			if (name) {
+				const safeName = safeStyle(name, valueText);
+				const key = safeName.startsWith("--") ? safeName : safeName.replace(/-([a-z])/g, (_, character) => character.toUpperCase());
+				next[key] = valueText;
+			}
+		}
+		this.#owner.styleData = next;
 		emitMutation(this.#owner, "styleText", { value: text });
 	}
 	get length() { this.#gate.check("dom"); return Object.keys(this.#owner.styleData).length; }
