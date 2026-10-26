@@ -1214,10 +1214,10 @@ class PpermNode {
 	get onclick() { this.#gate.check("dom"); return this.#eventProperties.get("onclick") ?? null; }
 	set onclick(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onclick must be a function or null");
 		const old = this.#eventProperties.get("onclick");
 		if (old) this.removeEventListener("click", old);
 		if (value == null) { this.#eventProperties.delete("onclick"); return; }
-		if (typeof value !== "function") throw new TypeError("onclick must be a function or null");
 		this.#eventProperties.set("onclick", value);
 		this.addEventListener("click", value);
 	}
@@ -1225,10 +1225,10 @@ class PpermNode {
 	get onchange() { this.#gate.check("dom"); return this.#eventProperties.get("onchange") ?? null; }
 	set onchange(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onchange must be a function or null");
 		const old = this.#eventProperties.get("onchange");
 		if (old) this.removeEventListener("change", old);
 		if (value == null) { this.#eventProperties.delete("onchange"); return; }
-		if (typeof value !== "function") throw new TypeError("onchange must be a function or null");
 		this.#eventProperties.set("onchange", value);
 		this.addEventListener("change", value);
 	}
@@ -1236,10 +1236,10 @@ class PpermNode {
 	get oninput() { this.#gate.check("dom"); return this.#eventProperties.get("oninput") ?? null; }
 	set oninput(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("oninput must be a function or null");
 		const old = this.#eventProperties.get("oninput");
 		if (old) this.removeEventListener("input", old);
 		if (value == null) { this.#eventProperties.delete("oninput"); return; }
-		if (typeof value !== "function") throw new TypeError("oninput must be a function or null");
 		this.#eventProperties.set("oninput", value);
 		this.addEventListener("input", value);
 	}
@@ -1247,10 +1247,10 @@ class PpermNode {
 	get onsubmit() { this.#gate.check("dom"); return this.#eventProperties.get("onsubmit") ?? null; }
 	set onsubmit(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onsubmit must be a function or null");
 		const old = this.#eventProperties.get("onsubmit");
 		if (old) this.removeEventListener("submit", old);
 		if (value == null) { this.#eventProperties.delete("onsubmit"); return; }
-		if (typeof value !== "function") throw new TypeError("onsubmit must be a function or null");
 		this.#eventProperties.set("onsubmit", value);
 		this.addEventListener("submit", value);
 	}
@@ -1258,10 +1258,10 @@ class PpermNode {
 	get onfocus() { this.#gate.check("dom"); return this.#eventProperties.get("onfocus") ?? null; }
 	set onfocus(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onfocus must be a function or null");
 		const old = this.#eventProperties.get("onfocus");
 		if (old) this.removeEventListener("focus", old);
 		if (value == null) { this.#eventProperties.delete("onfocus"); return; }
-		if (typeof value !== "function") throw new TypeError("onfocus must be a function or null");
 		this.#eventProperties.set("onfocus", value);
 		this.addEventListener("focus", value);
 	}
@@ -1269,20 +1269,20 @@ class PpermNode {
 	get onblur() { this.#gate.check("dom"); return this.#eventProperties.get("onblur") ?? null; }
 	set onblur(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onblur must be a function or null");
 		const old = this.#eventProperties.get("onblur");
 		if (old) this.removeEventListener("blur", old);
 		if (value == null) { this.#eventProperties.delete("onblur"); return; }
-		if (typeof value !== "function") throw new TypeError("onblur must be a function or null");
 		this.#eventProperties.set("onblur", value);
 		this.addEventListener("blur", value);
 	}
 	get ondblclick() { this.#gate.check("dom"); return this.#eventProperties.get("ondblclick") ?? null; }
 	set ondblclick(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("ondblclick must be a function or null");
 		const old = this.#eventProperties.get("ondblclick");
 		if (old) this.removeEventListener("dblclick", old);
 		if (value == null) { this.#eventProperties.delete("ondblclick"); return; }
-		if (typeof value !== "function") throw new TypeError("ondblclick must be a function or null");
 		this.#eventProperties.set("ondblclick", value);
 		this.addEventListener("dblclick", value);
 	}
@@ -1290,10 +1290,10 @@ class PpermNode {
 	get oncontextmenu() { this.#gate.check("dom"); return this.#eventProperties.get("oncontextmenu") ?? null; }
 	set oncontextmenu(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("oncontextmenu must be a function or null");
 		const old = this.#eventProperties.get("oncontextmenu");
 		if (old) this.removeEventListener("contextmenu", old);
 		if (value == null) { this.#eventProperties.delete("oncontextmenu"); return; }
-		if (typeof value !== "function") throw new TypeError("oncontextmenu must be a function or null");
 		this.#eventProperties.set("oncontextmenu", value);
 		this.addEventListener("contextmenu", value);
 	}
@@ -1301,10 +1301,10 @@ class PpermNode {
 	get onmousedown() { this.#gate.check("dom"); return this.#eventProperties.get("onmousedown") ?? null; }
 	set onmousedown(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onmousedown must be a function or null");
 		const old = this.#eventProperties.get("onmousedown");
 		if (old) this.removeEventListener("mousedown", old);
 		if (value == null) { this.#eventProperties.delete("onmousedown"); return; }
-		if (typeof value !== "function") throw new TypeError("onmousedown must be a function or null");
 		this.#eventProperties.set("onmousedown", value);
 		this.addEventListener("mousedown", value);
 	}
@@ -1312,10 +1312,10 @@ class PpermNode {
 	get onmouseup() { this.#gate.check("dom"); return this.#eventProperties.get("onmouseup") ?? null; }
 	set onmouseup(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onmouseup must be a function or null");
 		const old = this.#eventProperties.get("onmouseup");
 		if (old) this.removeEventListener("mouseup", old);
 		if (value == null) { this.#eventProperties.delete("onmouseup"); return; }
-		if (typeof value !== "function") throw new TypeError("onmouseup must be a function or null");
 		this.#eventProperties.set("onmouseup", value);
 		this.addEventListener("mouseup", value);
 	}
@@ -1323,10 +1323,10 @@ class PpermNode {
 	get onmousemove() { this.#gate.check("dom"); return this.#eventProperties.get("onmousemove") ?? null; }
 	set onmousemove(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onmousemove must be a function or null");
 		const old = this.#eventProperties.get("onmousemove");
 		if (old) this.removeEventListener("mousemove", old);
 		if (value == null) { this.#eventProperties.delete("onmousemove"); return; }
-		if (typeof value !== "function") throw new TypeError("onmousemove must be a function or null");
 		this.#eventProperties.set("onmousemove", value);
 		this.addEventListener("mousemove", value);
 	}
@@ -1334,10 +1334,10 @@ class PpermNode {
 	get onmouseover() { this.#gate.check("dom"); return this.#eventProperties.get("onmouseover") ?? null; }
 	set onmouseover(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onmouseover must be a function or null");
 		const old = this.#eventProperties.get("onmouseover");
 		if (old) this.removeEventListener("mouseover", old);
 		if (value == null) { this.#eventProperties.delete("onmouseover"); return; }
-		if (typeof value !== "function") throw new TypeError("onmouseover must be a function or null");
 		this.#eventProperties.set("onmouseover", value);
 		this.addEventListener("mouseover", value);
 	}
@@ -1345,10 +1345,10 @@ class PpermNode {
 	get onmouseout() { this.#gate.check("dom"); return this.#eventProperties.get("onmouseout") ?? null; }
 	set onmouseout(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onmouseout must be a function or null");
 		const old = this.#eventProperties.get("onmouseout");
 		if (old) this.removeEventListener("mouseout", old);
 		if (value == null) { this.#eventProperties.delete("onmouseout"); return; }
-		if (typeof value !== "function") throw new TypeError("onmouseout must be a function or null");
 		this.#eventProperties.set("onmouseout", value);
 		this.addEventListener("mouseout", value);
 	}
@@ -1356,10 +1356,10 @@ class PpermNode {
 	get onmouseenter() { this.#gate.check("dom"); return this.#eventProperties.get("onmouseenter") ?? null; }
 	set onmouseenter(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onmouseenter must be a function or null");
 		const old = this.#eventProperties.get("onmouseenter");
 		if (old) this.removeEventListener("mouseenter", old);
 		if (value == null) { this.#eventProperties.delete("onmouseenter"); return; }
-		if (typeof value !== "function") throw new TypeError("onmouseenter must be a function or null");
 		this.#eventProperties.set("onmouseenter", value);
 		this.addEventListener("mouseenter", value);
 	}
@@ -1367,10 +1367,10 @@ class PpermNode {
 	get onmouseleave() { this.#gate.check("dom"); return this.#eventProperties.get("onmouseleave") ?? null; }
 	set onmouseleave(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onmouseleave must be a function or null");
 		const old = this.#eventProperties.get("onmouseleave");
 		if (old) this.removeEventListener("mouseleave", old);
 		if (value == null) { this.#eventProperties.delete("onmouseleave"); return; }
-		if (typeof value !== "function") throw new TypeError("onmouseleave must be a function or null");
 		this.#eventProperties.set("onmouseleave", value);
 		this.addEventListener("mouseleave", value);
 	}
@@ -1378,10 +1378,10 @@ class PpermNode {
 	get onkeydown() { this.#gate.check("dom"); return this.#eventProperties.get("onkeydown") ?? null; }
 	set onkeydown(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onkeydown must be a function or null");
 		const old = this.#eventProperties.get("onkeydown");
 		if (old) this.removeEventListener("keydown", old);
 		if (value == null) { this.#eventProperties.delete("onkeydown"); return; }
-		if (typeof value !== "function") throw new TypeError("onkeydown must be a function or null");
 		this.#eventProperties.set("onkeydown", value);
 		this.addEventListener("keydown", value);
 	}
@@ -1389,10 +1389,10 @@ class PpermNode {
 	get onkeyup() { this.#gate.check("dom"); return this.#eventProperties.get("onkeyup") ?? null; }
 	set onkeyup(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onkeyup must be a function or null");
 		const old = this.#eventProperties.get("onkeyup");
 		if (old) this.removeEventListener("keyup", old);
 		if (value == null) { this.#eventProperties.delete("onkeyup"); return; }
-		if (typeof value !== "function") throw new TypeError("onkeyup must be a function or null");
 		this.#eventProperties.set("onkeyup", value);
 		this.addEventListener("keyup", value);
 	}
@@ -1400,10 +1400,10 @@ class PpermNode {
 	get onkeypress() { this.#gate.check("dom"); return this.#eventProperties.get("onkeypress") ?? null; }
 	set onkeypress(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onkeypress must be a function or null");
 		const old = this.#eventProperties.get("onkeypress");
 		if (old) this.removeEventListener("keypress", old);
 		if (value == null) { this.#eventProperties.delete("onkeypress"); return; }
-		if (typeof value !== "function") throw new TypeError("onkeypress must be a function or null");
 		this.#eventProperties.set("onkeypress", value);
 		this.addEventListener("keypress", value);
 	}
@@ -1411,10 +1411,10 @@ class PpermNode {
 	get onwheel() { this.#gate.check("dom"); return this.#eventProperties.get("onwheel") ?? null; }
 	set onwheel(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onwheel must be a function or null");
 		const old = this.#eventProperties.get("onwheel");
 		if (old) this.removeEventListener("wheel", old);
 		if (value == null) { this.#eventProperties.delete("onwheel"); return; }
-		if (typeof value !== "function") throw new TypeError("onwheel must be a function or null");
 		this.#eventProperties.set("onwheel", value);
 		this.addEventListener("wheel", value);
 	}
@@ -1422,10 +1422,10 @@ class PpermNode {
 	get onscroll() { this.#gate.check("dom"); return this.#eventProperties.get("onscroll") ?? null; }
 	set onscroll(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onscroll must be a function or null");
 		const old = this.#eventProperties.get("onscroll");
 		if (old) this.removeEventListener("scroll", old);
 		if (value == null) { this.#eventProperties.delete("onscroll"); return; }
-		if (typeof value !== "function") throw new TypeError("onscroll must be a function or null");
 		this.#eventProperties.set("onscroll", value);
 		this.addEventListener("scroll", value);
 	}
@@ -1433,10 +1433,10 @@ class PpermNode {
 	get onload() { this.#gate.check("dom"); return this.#eventProperties.get("onload") ?? null; }
 	set onload(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onload must be a function or null");
 		const old = this.#eventProperties.get("onload");
 		if (old) this.removeEventListener("load", old);
 		if (value == null) { this.#eventProperties.delete("onload"); return; }
-		if (typeof value !== "function") throw new TypeError("onload must be a function or null");
 		this.#eventProperties.set("onload", value);
 		this.addEventListener("load", value);
 	}
@@ -1444,10 +1444,10 @@ class PpermNode {
 	get onerror() { this.#gate.check("dom"); return this.#eventProperties.get("onerror") ?? null; }
 	set onerror(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onerror must be a function or null");
 		const old = this.#eventProperties.get("onerror");
 		if (old) this.removeEventListener("error", old);
 		if (value == null) { this.#eventProperties.delete("onerror"); return; }
-		if (typeof value !== "function") throw new TypeError("onerror must be a function or null");
 		this.#eventProperties.set("onerror", value);
 		this.addEventListener("error", value);
 	}
@@ -1455,10 +1455,10 @@ class PpermNode {
 	get onreset() { this.#gate.check("dom"); return this.#eventProperties.get("onreset") ?? null; }
 	set onreset(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onreset must be a function or null");
 		const old = this.#eventProperties.get("onreset");
 		if (old) this.removeEventListener("reset", old);
 		if (value == null) { this.#eventProperties.delete("onreset"); return; }
-		if (typeof value !== "function") throw new TypeError("onreset must be a function or null");
 		this.#eventProperties.set("onreset", value);
 		this.addEventListener("reset", value);
 	}
@@ -1466,10 +1466,10 @@ class PpermNode {
 	get onselect() { this.#gate.check("dom"); return this.#eventProperties.get("onselect") ?? null; }
 	set onselect(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onselect must be a function or null");
 		const old = this.#eventProperties.get("onselect");
 		if (old) this.removeEventListener("select", old);
 		if (value == null) { this.#eventProperties.delete("onselect"); return; }
-		if (typeof value !== "function") throw new TypeError("onselect must be a function or null");
 		this.#eventProperties.set("onselect", value);
 		this.addEventListener("select", value);
 	}
@@ -1477,10 +1477,10 @@ class PpermNode {
 	get oninvalid() { this.#gate.check("dom"); return this.#eventProperties.get("oninvalid") ?? null; }
 	set oninvalid(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("oninvalid must be a function or null");
 		const old = this.#eventProperties.get("oninvalid");
 		if (old) this.removeEventListener("invalid", old);
 		if (value == null) { this.#eventProperties.delete("oninvalid"); return; }
-		if (typeof value !== "function") throw new TypeError("oninvalid must be a function or null");
 		this.#eventProperties.set("oninvalid", value);
 		this.addEventListener("invalid", value);
 	}
@@ -1488,10 +1488,10 @@ class PpermNode {
 	get onfocusin() { this.#gate.check("dom"); return this.#eventProperties.get("onfocusin") ?? null; }
 	set onfocusin(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onfocusin must be a function or null");
 		const old = this.#eventProperties.get("onfocusin");
 		if (old) this.removeEventListener("focusin", old);
 		if (value == null) { this.#eventProperties.delete("onfocusin"); return; }
-		if (typeof value !== "function") throw new TypeError("onfocusin must be a function or null");
 		this.#eventProperties.set("onfocusin", value);
 		this.addEventListener("focusin", value);
 	}
@@ -1499,10 +1499,10 @@ class PpermNode {
 	get onfocusout() { this.#gate.check("dom"); return this.#eventProperties.get("onfocusout") ?? null; }
 	set onfocusout(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onfocusout must be a function or null");
 		const old = this.#eventProperties.get("onfocusout");
 		if (old) this.removeEventListener("focusout", old);
 		if (value == null) { this.#eventProperties.delete("onfocusout"); return; }
-		if (typeof value !== "function") throw new TypeError("onfocusout must be a function or null");
 		this.#eventProperties.set("onfocusout", value);
 		this.addEventListener("focusout", value);
 	}
@@ -1510,10 +1510,10 @@ class PpermNode {
 	get onpointerdown() { this.#gate.check("dom"); return this.#eventProperties.get("onpointerdown") ?? null; }
 	set onpointerdown(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onpointerdown must be a function or null");
 		const old = this.#eventProperties.get("onpointerdown");
 		if (old) this.removeEventListener("pointerdown", old);
 		if (value == null) { this.#eventProperties.delete("onpointerdown"); return; }
-		if (typeof value !== "function") throw new TypeError("onpointerdown must be a function or null");
 		this.#eventProperties.set("onpointerdown", value);
 		this.addEventListener("pointerdown", value);
 	}
@@ -1521,10 +1521,10 @@ class PpermNode {
 	get onpointerup() { this.#gate.check("dom"); return this.#eventProperties.get("onpointerup") ?? null; }
 	set onpointerup(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onpointerup must be a function or null");
 		const old = this.#eventProperties.get("onpointerup");
 		if (old) this.removeEventListener("pointerup", old);
 		if (value == null) { this.#eventProperties.delete("onpointerup"); return; }
-		if (typeof value !== "function") throw new TypeError("onpointerup must be a function or null");
 		this.#eventProperties.set("onpointerup", value);
 		this.addEventListener("pointerup", value);
 	}
@@ -1532,10 +1532,10 @@ class PpermNode {
 	get onpointermove() { this.#gate.check("dom"); return this.#eventProperties.get("onpointermove") ?? null; }
 	set onpointermove(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onpointermove must be a function or null");
 		const old = this.#eventProperties.get("onpointermove");
 		if (old) this.removeEventListener("pointermove", old);
 		if (value == null) { this.#eventProperties.delete("onpointermove"); return; }
-		if (typeof value !== "function") throw new TypeError("onpointermove must be a function or null");
 		this.#eventProperties.set("onpointermove", value);
 		this.addEventListener("pointermove", value);
 	}
@@ -1543,10 +1543,10 @@ class PpermNode {
 	get onpointerover() { this.#gate.check("dom"); return this.#eventProperties.get("onpointerover") ?? null; }
 	set onpointerover(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onpointerover must be a function or null");
 		const old = this.#eventProperties.get("onpointerover");
 		if (old) this.removeEventListener("pointerover", old);
 		if (value == null) { this.#eventProperties.delete("onpointerover"); return; }
-		if (typeof value !== "function") throw new TypeError("onpointerover must be a function or null");
 		this.#eventProperties.set("onpointerover", value);
 		this.addEventListener("pointerover", value);
 	}
@@ -1554,10 +1554,10 @@ class PpermNode {
 	get onpointerout() { this.#gate.check("dom"); return this.#eventProperties.get("onpointerout") ?? null; }
 	set onpointerout(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onpointerout must be a function or null");
 		const old = this.#eventProperties.get("onpointerout");
 		if (old) this.removeEventListener("pointerout", old);
 		if (value == null) { this.#eventProperties.delete("onpointerout"); return; }
-		if (typeof value !== "function") throw new TypeError("onpointerout must be a function or null");
 		this.#eventProperties.set("onpointerout", value);
 		this.addEventListener("pointerout", value);
 	}
@@ -1565,10 +1565,10 @@ class PpermNode {
 	get onpointerenter() { this.#gate.check("dom"); return this.#eventProperties.get("onpointerenter") ?? null; }
 	set onpointerenter(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onpointerenter must be a function or null");
 		const old = this.#eventProperties.get("onpointerenter");
 		if (old) this.removeEventListener("pointerenter", old);
 		if (value == null) { this.#eventProperties.delete("onpointerenter"); return; }
-		if (typeof value !== "function") throw new TypeError("onpointerenter must be a function or null");
 		this.#eventProperties.set("onpointerenter", value);
 		this.addEventListener("pointerenter", value);
 	}
@@ -1576,10 +1576,10 @@ class PpermNode {
 	get onpointerleave() { this.#gate.check("dom"); return this.#eventProperties.get("onpointerleave") ?? null; }
 	set onpointerleave(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onpointerleave must be a function or null");
 		const old = this.#eventProperties.get("onpointerleave");
 		if (old) this.removeEventListener("pointerleave", old);
 		if (value == null) { this.#eventProperties.delete("onpointerleave"); return; }
-		if (typeof value !== "function") throw new TypeError("onpointerleave must be a function or null");
 		this.#eventProperties.set("onpointerleave", value);
 		this.addEventListener("pointerleave", value);
 	}
@@ -1587,10 +1587,10 @@ class PpermNode {
 	get onpointercancel() { this.#gate.check("dom"); return this.#eventProperties.get("onpointercancel") ?? null; }
 	set onpointercancel(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onpointercancel must be a function or null");
 		const old = this.#eventProperties.get("onpointercancel");
 		if (old) this.removeEventListener("pointercancel", old);
 		if (value == null) { this.#eventProperties.delete("onpointercancel"); return; }
-		if (typeof value !== "function") throw new TypeError("onpointercancel must be a function or null");
 		this.#eventProperties.set("onpointercancel", value);
 		this.addEventListener("pointercancel", value);
 	}
@@ -1598,10 +1598,10 @@ class PpermNode {
 	get ontouchstart() { this.#gate.check("dom"); return this.#eventProperties.get("ontouchstart") ?? null; }
 	set ontouchstart(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("ontouchstart must be a function or null");
 		const old = this.#eventProperties.get("ontouchstart");
 		if (old) this.removeEventListener("touchstart", old);
 		if (value == null) { this.#eventProperties.delete("ontouchstart"); return; }
-		if (typeof value !== "function") throw new TypeError("ontouchstart must be a function or null");
 		this.#eventProperties.set("ontouchstart", value);
 		this.addEventListener("touchstart", value);
 	}
@@ -1609,10 +1609,10 @@ class PpermNode {
 	get ontouchmove() { this.#gate.check("dom"); return this.#eventProperties.get("ontouchmove") ?? null; }
 	set ontouchmove(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("ontouchmove must be a function or null");
 		const old = this.#eventProperties.get("ontouchmove");
 		if (old) this.removeEventListener("touchmove", old);
 		if (value == null) { this.#eventProperties.delete("ontouchmove"); return; }
-		if (typeof value !== "function") throw new TypeError("ontouchmove must be a function or null");
 		this.#eventProperties.set("ontouchmove", value);
 		this.addEventListener("touchmove", value);
 	}
@@ -1620,10 +1620,10 @@ class PpermNode {
 	get ontouchend() { this.#gate.check("dom"); return this.#eventProperties.get("ontouchend") ?? null; }
 	set ontouchend(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("ontouchend must be a function or null");
 		const old = this.#eventProperties.get("ontouchend");
 		if (old) this.removeEventListener("touchend", old);
 		if (value == null) { this.#eventProperties.delete("ontouchend"); return; }
-		if (typeof value !== "function") throw new TypeError("ontouchend must be a function or null");
 		this.#eventProperties.set("ontouchend", value);
 		this.addEventListener("touchend", value);
 	}
@@ -1631,10 +1631,10 @@ class PpermNode {
 	get ontouchcancel() { this.#gate.check("dom"); return this.#eventProperties.get("ontouchcancel") ?? null; }
 	set ontouchcancel(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("ontouchcancel must be a function or null");
 		const old = this.#eventProperties.get("ontouchcancel");
 		if (old) this.removeEventListener("touchcancel", old);
 		if (value == null) { this.#eventProperties.delete("ontouchcancel"); return; }
-		if (typeof value !== "function") throw new TypeError("ontouchcancel must be a function or null");
 		this.#eventProperties.set("ontouchcancel", value);
 		this.addEventListener("touchcancel", value);
 	}
@@ -1642,10 +1642,10 @@ class PpermNode {
 	get ondrag() { this.#gate.check("dom"); return this.#eventProperties.get("ondrag") ?? null; }
 	set ondrag(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("ondrag must be a function or null");
 		const old = this.#eventProperties.get("ondrag");
 		if (old) this.removeEventListener("drag", old);
 		if (value == null) { this.#eventProperties.delete("ondrag"); return; }
-		if (typeof value !== "function") throw new TypeError("ondrag must be a function or null");
 		this.#eventProperties.set("ondrag", value);
 		this.addEventListener("drag", value);
 	}
@@ -1653,10 +1653,10 @@ class PpermNode {
 	get ondragstart() { this.#gate.check("dom"); return this.#eventProperties.get("ondragstart") ?? null; }
 	set ondragstart(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("ondragstart must be a function or null");
 		const old = this.#eventProperties.get("ondragstart");
 		if (old) this.removeEventListener("dragstart", old);
 		if (value == null) { this.#eventProperties.delete("ondragstart"); return; }
-		if (typeof value !== "function") throw new TypeError("ondragstart must be a function or null");
 		this.#eventProperties.set("ondragstart", value);
 		this.addEventListener("dragstart", value);
 	}
@@ -1664,10 +1664,10 @@ class PpermNode {
 	get ondragend() { this.#gate.check("dom"); return this.#eventProperties.get("ondragend") ?? null; }
 	set ondragend(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("ondragend must be a function or null");
 		const old = this.#eventProperties.get("ondragend");
 		if (old) this.removeEventListener("dragend", old);
 		if (value == null) { this.#eventProperties.delete("ondragend"); return; }
-		if (typeof value !== "function") throw new TypeError("ondragend must be a function or null");
 		this.#eventProperties.set("ondragend", value);
 		this.addEventListener("dragend", value);
 	}
@@ -1675,10 +1675,10 @@ class PpermNode {
 	get ondragenter() { this.#gate.check("dom"); return this.#eventProperties.get("ondragenter") ?? null; }
 	set ondragenter(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("ondragenter must be a function or null");
 		const old = this.#eventProperties.get("ondragenter");
 		if (old) this.removeEventListener("dragenter", old);
 		if (value == null) { this.#eventProperties.delete("ondragenter"); return; }
-		if (typeof value !== "function") throw new TypeError("ondragenter must be a function or null");
 		this.#eventProperties.set("ondragenter", value);
 		this.addEventListener("dragenter", value);
 	}
@@ -1686,10 +1686,10 @@ class PpermNode {
 	get ondragover() { this.#gate.check("dom"); return this.#eventProperties.get("ondragover") ?? null; }
 	set ondragover(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("ondragover must be a function or null");
 		const old = this.#eventProperties.get("ondragover");
 		if (old) this.removeEventListener("dragover", old);
 		if (value == null) { this.#eventProperties.delete("ondragover"); return; }
-		if (typeof value !== "function") throw new TypeError("ondragover must be a function or null");
 		this.#eventProperties.set("ondragover", value);
 		this.addEventListener("dragover", value);
 	}
@@ -1697,10 +1697,10 @@ class PpermNode {
 	get ondragleave() { this.#gate.check("dom"); return this.#eventProperties.get("ondragleave") ?? null; }
 	set ondragleave(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("ondragleave must be a function or null");
 		const old = this.#eventProperties.get("ondragleave");
 		if (old) this.removeEventListener("dragleave", old);
 		if (value == null) { this.#eventProperties.delete("ondragleave"); return; }
-		if (typeof value !== "function") throw new TypeError("ondragleave must be a function or null");
 		this.#eventProperties.set("ondragleave", value);
 		this.addEventListener("dragleave", value);
 	}
@@ -1708,10 +1708,10 @@ class PpermNode {
 	get ondrop() { this.#gate.check("dom"); return this.#eventProperties.get("ondrop") ?? null; }
 	set ondrop(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("ondrop must be a function or null");
 		const old = this.#eventProperties.get("ondrop");
 		if (old) this.removeEventListener("drop", old);
 		if (value == null) { this.#eventProperties.delete("ondrop"); return; }
-		if (typeof value !== "function") throw new TypeError("ondrop must be a function or null");
 		this.#eventProperties.set("ondrop", value);
 		this.addEventListener("drop", value);
 	}
@@ -1719,10 +1719,10 @@ class PpermNode {
 	get oncopy() { this.#gate.check("dom"); return this.#eventProperties.get("oncopy") ?? null; }
 	set oncopy(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("oncopy must be a function or null");
 		const old = this.#eventProperties.get("oncopy");
 		if (old) this.removeEventListener("copy", old);
 		if (value == null) { this.#eventProperties.delete("oncopy"); return; }
-		if (typeof value !== "function") throw new TypeError("oncopy must be a function or null");
 		this.#eventProperties.set("oncopy", value);
 		this.addEventListener("copy", value);
 	}
@@ -1730,10 +1730,10 @@ class PpermNode {
 	get oncut() { this.#gate.check("dom"); return this.#eventProperties.get("oncut") ?? null; }
 	set oncut(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("oncut must be a function or null");
 		const old = this.#eventProperties.get("oncut");
 		if (old) this.removeEventListener("cut", old);
 		if (value == null) { this.#eventProperties.delete("oncut"); return; }
-		if (typeof value !== "function") throw new TypeError("oncut must be a function or null");
 		this.#eventProperties.set("oncut", value);
 		this.addEventListener("cut", value);
 	}
@@ -1741,10 +1741,10 @@ class PpermNode {
 	get onpaste() { this.#gate.check("dom"); return this.#eventProperties.get("onpaste") ?? null; }
 	set onpaste(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onpaste must be a function or null");
 		const old = this.#eventProperties.get("onpaste");
 		if (old) this.removeEventListener("paste", old);
 		if (value == null) { this.#eventProperties.delete("onpaste"); return; }
-		if (typeof value !== "function") throw new TypeError("onpaste must be a function or null");
 		this.#eventProperties.set("onpaste", value);
 		this.addEventListener("paste", value);
 	}
@@ -1752,10 +1752,10 @@ class PpermNode {
 	get onanimationstart() { this.#gate.check("dom"); return this.#eventProperties.get("onanimationstart") ?? null; }
 	set onanimationstart(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onanimationstart must be a function or null");
 		const old = this.#eventProperties.get("onanimationstart");
 		if (old) this.removeEventListener("animationstart", old);
 		if (value == null) { this.#eventProperties.delete("onanimationstart"); return; }
-		if (typeof value !== "function") throw new TypeError("onanimationstart must be a function or null");
 		this.#eventProperties.set("onanimationstart", value);
 		this.addEventListener("animationstart", value);
 	}
@@ -1763,10 +1763,10 @@ class PpermNode {
 	get onanimationend() { this.#gate.check("dom"); return this.#eventProperties.get("onanimationend") ?? null; }
 	set onanimationend(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onanimationend must be a function or null");
 		const old = this.#eventProperties.get("onanimationend");
 		if (old) this.removeEventListener("animationend", old);
 		if (value == null) { this.#eventProperties.delete("onanimationend"); return; }
-		if (typeof value !== "function") throw new TypeError("onanimationend must be a function or null");
 		this.#eventProperties.set("onanimationend", value);
 		this.addEventListener("animationend", value);
 	}
@@ -1774,10 +1774,10 @@ class PpermNode {
 	get onanimationiteration() { this.#gate.check("dom"); return this.#eventProperties.get("onanimationiteration") ?? null; }
 	set onanimationiteration(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onanimationiteration must be a function or null");
 		const old = this.#eventProperties.get("onanimationiteration");
 		if (old) this.removeEventListener("animationiteration", old);
 		if (value == null) { this.#eventProperties.delete("onanimationiteration"); return; }
-		if (typeof value !== "function") throw new TypeError("onanimationiteration must be a function or null");
 		this.#eventProperties.set("onanimationiteration", value);
 		this.addEventListener("animationiteration", value);
 	}
@@ -1785,10 +1785,10 @@ class PpermNode {
 	get ontransitionend() { this.#gate.check("dom"); return this.#eventProperties.get("ontransitionend") ?? null; }
 	set ontransitionend(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("ontransitionend must be a function or null");
 		const old = this.#eventProperties.get("ontransitionend");
 		if (old) this.removeEventListener("transitionend", old);
 		if (value == null) { this.#eventProperties.delete("ontransitionend"); return; }
-		if (typeof value !== "function") throw new TypeError("ontransitionend must be a function or null");
 		this.#eventProperties.set("ontransitionend", value);
 		this.addEventListener("transitionend", value);
 	}
@@ -1796,10 +1796,10 @@ class PpermNode {
 	get onplay() { this.#gate.check("dom"); return this.#eventProperties.get("onplay") ?? null; }
 	set onplay(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onplay must be a function or null");
 		const old = this.#eventProperties.get("onplay");
 		if (old) this.removeEventListener("play", old);
 		if (value == null) { this.#eventProperties.delete("onplay"); return; }
-		if (typeof value !== "function") throw new TypeError("onplay must be a function or null");
 		this.#eventProperties.set("onplay", value);
 		this.addEventListener("play", value);
 	}
@@ -1807,10 +1807,10 @@ class PpermNode {
 	get onpause() { this.#gate.check("dom"); return this.#eventProperties.get("onpause") ?? null; }
 	set onpause(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onpause must be a function or null");
 		const old = this.#eventProperties.get("onpause");
 		if (old) this.removeEventListener("pause", old);
 		if (value == null) { this.#eventProperties.delete("onpause"); return; }
-		if (typeof value !== "function") throw new TypeError("onpause must be a function or null");
 		this.#eventProperties.set("onpause", value);
 		this.addEventListener("pause", value);
 	}
@@ -1818,10 +1818,10 @@ class PpermNode {
 	get onended() { this.#gate.check("dom"); return this.#eventProperties.get("onended") ?? null; }
 	set onended(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onended must be a function or null");
 		const old = this.#eventProperties.get("onended");
 		if (old) this.removeEventListener("ended", old);
 		if (value == null) { this.#eventProperties.delete("onended"); return; }
-		if (typeof value !== "function") throw new TypeError("onended must be a function or null");
 		this.#eventProperties.set("onended", value);
 		this.addEventListener("ended", value);
 	}
@@ -1829,10 +1829,10 @@ class PpermNode {
 	get ontimeupdate() { this.#gate.check("dom"); return this.#eventProperties.get("ontimeupdate") ?? null; }
 	set ontimeupdate(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("ontimeupdate must be a function or null");
 		const old = this.#eventProperties.get("ontimeupdate");
 		if (old) this.removeEventListener("timeupdate", old);
 		if (value == null) { this.#eventProperties.delete("ontimeupdate"); return; }
-		if (typeof value !== "function") throw new TypeError("ontimeupdate must be a function or null");
 		this.#eventProperties.set("ontimeupdate", value);
 		this.addEventListener("timeupdate", value);
 	}
@@ -1840,10 +1840,10 @@ class PpermNode {
 	get onvolumechange() { this.#gate.check("dom"); return this.#eventProperties.get("onvolumechange") ?? null; }
 	set onvolumechange(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onvolumechange must be a function or null");
 		const old = this.#eventProperties.get("onvolumechange");
 		if (old) this.removeEventListener("volumechange", old);
 		if (value == null) { this.#eventProperties.delete("onvolumechange"); return; }
-		if (typeof value !== "function") throw new TypeError("onvolumechange must be a function or null");
 		this.#eventProperties.set("onvolumechange", value);
 		this.addEventListener("volumechange", value);
 	}
@@ -1851,10 +1851,10 @@ class PpermNode {
 	get oncanplay() { this.#gate.check("dom"); return this.#eventProperties.get("oncanplay") ?? null; }
 	set oncanplay(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("oncanplay must be a function or null");
 		const old = this.#eventProperties.get("oncanplay");
 		if (old) this.removeEventListener("canplay", old);
 		if (value == null) { this.#eventProperties.delete("oncanplay"); return; }
-		if (typeof value !== "function") throw new TypeError("oncanplay must be a function or null");
 		this.#eventProperties.set("oncanplay", value);
 		this.addEventListener("canplay", value);
 	}
@@ -1862,10 +1862,10 @@ class PpermNode {
 	get onwaiting() { this.#gate.check("dom"); return this.#eventProperties.get("onwaiting") ?? null; }
 	set onwaiting(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onwaiting must be a function or null");
 		const old = this.#eventProperties.get("onwaiting");
 		if (old) this.removeEventListener("waiting", old);
 		if (value == null) { this.#eventProperties.delete("onwaiting"); return; }
-		if (typeof value !== "function") throw new TypeError("onwaiting must be a function or null");
 		this.#eventProperties.set("onwaiting", value);
 		this.addEventListener("waiting", value);
 	}
@@ -1873,10 +1873,10 @@ class PpermNode {
 	get onprogress() { this.#gate.check("dom"); return this.#eventProperties.get("onprogress") ?? null; }
 	set onprogress(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onprogress must be a function or null");
 		const old = this.#eventProperties.get("onprogress");
 		if (old) this.removeEventListener("progress", old);
 		if (value == null) { this.#eventProperties.delete("onprogress"); return; }
-		if (typeof value !== "function") throw new TypeError("onprogress must be a function or null");
 		this.#eventProperties.set("onprogress", value);
 		this.addEventListener("progress", value);
 	}
@@ -1884,10 +1884,10 @@ class PpermNode {
 	get oncanplaythrough() { this.#gate.check("dom"); return this.#eventProperties.get("oncanplaythrough") ?? null; }
 	set oncanplaythrough(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("oncanplaythrough must be a function or null");
 		const old = this.#eventProperties.get("oncanplaythrough");
 		if (old) this.removeEventListener("canplaythrough", old);
 		if (value == null) { this.#eventProperties.delete("oncanplaythrough"); return; }
-		if (typeof value !== "function") throw new TypeError("oncanplaythrough must be a function or null");
 		this.#eventProperties.set("oncanplaythrough", value);
 		this.addEventListener("canplaythrough", value);
 	}
@@ -1895,10 +1895,10 @@ class PpermNode {
 	get onratechange() { this.#gate.check("dom"); return this.#eventProperties.get("onratechange") ?? null; }
 	set onratechange(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onratechange must be a function or null");
 		const old = this.#eventProperties.get("onratechange");
 		if (old) this.removeEventListener("ratechange", old);
 		if (value == null) { this.#eventProperties.delete("onratechange"); return; }
-		if (typeof value !== "function") throw new TypeError("onratechange must be a function or null");
 		this.#eventProperties.set("onratechange", value);
 		this.addEventListener("ratechange", value);
 	}
@@ -1906,10 +1906,10 @@ class PpermNode {
 	get onseeking() { this.#gate.check("dom"); return this.#eventProperties.get("onseeking") ?? null; }
 	set onseeking(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onseeking must be a function or null");
 		const old = this.#eventProperties.get("onseeking");
 		if (old) this.removeEventListener("seeking", old);
 		if (value == null) { this.#eventProperties.delete("onseeking"); return; }
-		if (typeof value !== "function") throw new TypeError("onseeking must be a function or null");
 		this.#eventProperties.set("onseeking", value);
 		this.addEventListener("seeking", value);
 	}
@@ -1917,10 +1917,10 @@ class PpermNode {
 	get onseeked() { this.#gate.check("dom"); return this.#eventProperties.get("onseeked") ?? null; }
 	set onseeked(value) {
 		this.#gate.check("dom");
+		if (value != null && typeof value !== "function") throw new TypeError("onseeked must be a function or null");
 		const old = this.#eventProperties.get("onseeked");
 		if (old) this.removeEventListener("seeked", old);
 		if (value == null) { this.#eventProperties.delete("onseeked"); return; }
-		if (typeof value !== "function") throw new TypeError("onseeked must be a function or null");
 		this.#eventProperties.set("onseeked", value);
 		this.addEventListener("seeked", value);
 	}
