@@ -167,7 +167,7 @@
 	<body>
 		<header>
 			<h1>pperm.js <span style="color:#818cf8">Playground</span></h1>
-			<p>在主线程中运行 JavaScript，DOM API 同步调用；按执行时间限时。</p>
+			<p>在主线程中异步并发运行多个 JavaScript 实例；DOM API 同步调用，每个实例独立限时。</p>
 		</header>
 
 		<main class="workspace">
@@ -200,8 +200,8 @@ await new Promise(resolve => {
 	}, { once: true });
 });</textarea>
 				<div class="toolbar">
-					<button class="primary" id="run">运行 ▶</button>
-					<button id="stop" disabled>停止</button>
+					<button class="primary" id="run">启动实例 ▶</button>
+					<button id="stop" disabled>停止全部</button>
 					<button id="clear">清空输出</button>
 				</div>
 			</section>
@@ -222,7 +222,7 @@ await new Promise(resolve => {
 						<label><input id="domEnabled" type="checkbox"> 允许操作指定元素</label>
 						<label for="domRoot">可操作的根元素选择器</label>
 						<input id="domRoot" value="#dom-target" aria-label="DOM 根元素选择器">
-						<p class="hint">DOM 操作同步执行，不需要为 DOM 写 await。默认运行时限为 10000 毫秒；主线程中的长表达式或原生调用仍无法被强制抢占。</p>
+						<p class="hint">DOM 操作同步执行，不需要为 DOM 写 await。每次点击“启动实例”都会创建一个独立进程；可重复启动并发运行，点击“停止全部”终止所有实例。每个实例默认限时 10000 毫秒。主线程中的长表达式或原生调用仍无法被强制抢占。</p>
 					</div>
 				</section>
 
@@ -244,39 +244,31 @@ await new Promise(resolve => {
 		</main>
 
 		<script type="module">
-			import pperm from "./pperm.js?v=20261025-11";
+			import pperm from "./pperm.js?v=20261026-1";
 
 			const editor = document.querySelector("#editor");
 			const output = document.querySelector("#output");
 			const status = document.querySelector("#status");
 			const runButton = document.querySelector("#run");
 			const stopButton = document.querySelector("#stop");
-			let process = null;
+			const processes = new Set();
 
 			function write(value) {
 				output.textContent += String(value) + "\n";
 			}
 
-			function setRunning(running) {
-				runButton.disabled = running;
-				stopButton.disabled = !running;
-				status.textContent = running ? "运行中" : "就绪";
+			function setRunning() {
+				stopButton.disabled = processes.size === 0;
+				status.textContent = processes.size ? "运行中：" + processes.size + " 个实例" : "就绪";
 			}
 
-			function stop() {
-				if (process) {
-					process.terminate();
-					process = null;
-				}
-
-				setRunning(false);
+			function stopAll() {
+				for (const current of processes) current.terminate();
+				processes.clear();
+				setRunning();
 			}
 
 			runButton.addEventListener("click", async () => {
-				stop();
-				output.textContent = "";
-				setRunning(true);
-
 				const current = pperm.create({
 					permissions: {
 						network: {
@@ -296,42 +288,33 @@ await new Promise(resolve => {
 					}
 				});
 
-				process = current;
+				processes.add(current);
+				setRunning();
+				write("[启动实例] 当前代码已提交执行");
 
 				current.addEventListener("message", event => {
-					if (process === current) {
-						write(event.detail);
-					}
+					if (processes.has(current)) write("[实例消息] " + event.detail);
 				});
 
 				current.addEventListener("error", event => {
-					if (process === current) {
-						write(event.detail?.stack ?? event.detail?.message ?? event.detail);
-					}
+					if (processes.has(current)) write("[实例错误] " + (event.detail?.stack ?? event.detail?.message ?? event.detail));
 				});
 
 				try {
 					const result = await current.run(editor.value);
-
-					if (process === current) {
-						write("=> " + String(result));
-					}
+					if (processes.has(current)) write("[实例完成] => " + String(result));
 				} catch (error) {
-					if (process === current) {
-						write(error?.stack ?? error?.message ?? error);
-					}
+					if (processes.has(current)) write("[实例失败] " + (error?.stack ?? error?.message ?? error));
 				} finally {
-					if (process === current) {
-						current.terminate();
-						process = null;
-						setRunning(false);
-					}
+					current.terminate();
+					processes.delete(current);
+					setRunning();
 				}
 			});
 
 			stopButton.addEventListener("click", () => {
-				stop();
-				write("[进程已停止]");
+				stopAll();
+				write("[全部实例已停止]");
 			});
 
 			document.querySelector("#clear").addEventListener("click", () => {
@@ -341,14 +324,12 @@ await new Promise(resolve => {
 			editor.addEventListener("keydown", event => {
 				if (event.key === "Tab") {
 					event.preventDefault();
-					const start = editor.selectionStart;
-					const end = editor.selectionEnd;
-					editor.setRangeText("\t", start, end, "end");
+					const selectionStart = editor.selectionStart;
+					const selectionEnd = editor.selectionEnd;
+					editor.setRangeText("\t", selectionStart, selectionEnd, "end");
 				}
 
-				if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-					runButton.click();
-				}
+				if ((event.ctrlKey || event.metaKey) && event.key === "Enter") runButton.click();
 			});
 		</script>
 	</body>
