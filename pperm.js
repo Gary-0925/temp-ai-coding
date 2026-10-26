@@ -134,6 +134,11 @@ export class PpermProcess extends EventTarget {
 				this.#worker?.terminate();
 				this.#worker = null;
 				this.#running = false;
+				for (const entry of this.#domListeners) {
+					entry.target.removeEventListener(entry.type, entry.handler);
+				}
+				this.#domListeners = [];
+				this.#pendingListeners = [];
 				if (error) {
 					this.dispatchEvent(new CustomEvent("error", { detail: error }));
 					reject(error);
@@ -153,7 +158,7 @@ export class PpermProcess extends EventTarget {
 					snapshot = { id: 1, nodeType: 1, tagName: "BODY", idName: "", className: "", text: "", attributes: {}, styleData: {}, children: [] };
 					this.#nodeIds = new Map();
 				}
-				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-5", import.meta.url));
+				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-6", import.meta.url));
 				this.#worker.addEventListener("message", event => {
 					if (settled || this.#terminated) return;
 					const message = event.data;
