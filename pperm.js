@@ -355,8 +355,7 @@ export class PpermProcess extends EventTarget {
 							}
 							this.#domListeners = this.#domListeners.filter(entry => entry.listenerId !== message.listenerId);
 						} else if (message.type === "documentTitle") {
-							if (!this.#root) throw new DOMException("DOM permission is not enabled", "NotAllowedError");
-							document.title = String(message.value);
+							this.#domBridge.apply({ op: "documentTitle", value: message.value }, this.#nodeIds, this.#root);
 						}
 						else if (message.type === "dispatch") this.#dispatchWorkerEvent(message);
 						else if (message.type === "done") finish(null, message.value);
@@ -380,6 +379,7 @@ export class PpermProcess extends EventTarget {
 					type: "init",
 					code: String(code),
 					permissions: this.permissions,
+					documentTitle: document.title,
 					snapshot
 				});
 				this.#timer = setTimeout(() => {
