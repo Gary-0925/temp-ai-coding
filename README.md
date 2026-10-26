@@ -46,7 +46,7 @@ second.terminate();
 - `pperm.create({ permissions, maxExecutionTimeMs })` creates a runner. The time limit defaults to 10000 ms.
 - `process.run(code)` runs code in a dedicated Worker and resolves with its completion value.
 - `process.postMessage(value)` dispatches a message event on the process.
-- `process.terminate()` terminates the Worker, stops further script execution, and removes registered DOM event listeners.
+- `process.terminate()` terminates the Worker, stops further script execution, and removes registered DOM event listeners. DOM listeners are also cleaned up when a run finishes or fails.
 - `message`, `error`, and `terminate` events report process activity.
 - `process.terminated` indicates whether termination has been requested.
 
