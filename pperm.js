@@ -220,6 +220,9 @@ class DomBridge {
 		switch (message.op) {
 			case "documentTitle": return this.setDocumentTitle(message);
 			case "text": return this.setText(target, message);
+			case "innerText": return this.setInnerText(target, message);
+			case "urlProperty": return this.setURLProperty(target, message);
+			case "numericProperty": return this.setNumericProperty(target, message);
 			case "style": return this.setStyle(target, message);
 			case "styleText": return this.setStyleText(target, message);
 			case "styleSetProperty": return this.setStyleProperty(target, message);
@@ -245,6 +248,36 @@ class DomBridge {
 	setText(target, message) {
 		this.policy.check();
 		target.textContent = String(message.value);
+	}
+
+	setInnerText(target, message) {
+		this.policy.check();
+		target.innerText = String(message.value);
+	}
+
+	setURLProperty(target, message) {
+		this.policy.check();
+		const property = String(message.property);
+		if (!["href", "src", "poster"].includes(property)) {
+			throw new DOMException("Unsupported URL property: " + property, "NotAllowedError");
+		}
+		const value = String(message.value);
+		this.policy.checkProperty(property, value);
+		const attribute = this.policy.checkAttribute(property, value);
+		if (property in target) target[property] = value;
+		else target.setAttribute(attribute, value);
+	}
+
+	setNumericProperty(target, message) {
+		this.policy.check();
+		const property = String(message.property);
+		if (!["tabIndex", "width", "height", "rows", "cols", "maxLength", "minLength", "rowSpan", "colSpan", "size", "start", "span"].includes(property)) {
+			throw new DOMException("Unsupported numeric DOM property: " + property, "NotAllowedError");
+		}
+		const value = Number(message.value);
+		if (!Number.isFinite(value)) throw new TypeError(property + " must be a finite number");
+		if (property in target) target[property] = value;
+		else target.setAttribute(property.replace(/[A-Z]/g, character => "-" + character.toLowerCase()), String(value));
 	}
 
 	setStyle(target, message) {
@@ -424,7 +457,7 @@ export class PpermProcess extends EventTarget {
 					snapshot = { id: 1, nodeType: 1, tagName: "BODY", idName: "", className: "", text: "", attributes: {}, styleData: {}, children: [] };
 					this.#nodeIds = new Map();
 				}
-				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-40", import.meta.url));
+				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-41", import.meta.url));
 				this.#worker.addEventListener("message", event => {
 					if (settled || this.#terminated) return;
 					const message = event.data;
