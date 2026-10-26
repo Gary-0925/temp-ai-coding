@@ -90,7 +90,17 @@ function wrap(node) {
 		contains: value => node.className.split(/\s+/).includes(String(value)),
 		add: (...values) => { node.className = [...new Set((node.className + " " + values.join(" ")).trim().split(/\s+/).filter(Boolean))].join(" "); node.attributes.class = node.className; mutate("attribute", node, { name: "class", value: node.className }); },
 		remove: (...values) => { const rm = new Set(values.map(String)); node.className = node.className.split(/\s+/).filter(x => x && !rm.has(x)).join(" "); node.attributes.class = node.className; mutate("attribute", node, { name: "class", value: node.className }); },
-		toggle: (value, force) => { const has = classList.contains(value); if (force === true || (!has && force !== false)) classList.add(value); else if (has) classList.remove(value); return classList.contains(value); }
+		toggle: (value, force) => { const has = classList.contains(value); if (force === true || (!has && force !== false)) classList.add(value); else if (has) classList.remove(value); return classList.contains(value); },
+		replace: (oldValue, newValue) => {
+			if (!classList.contains(oldValue)) return false;
+			const values = node.className.split(/\\s+/).filter(Boolean);
+			const index = values.indexOf(String(oldValue));
+			if (index >= 0) values[index] = String(newValue);
+			node.className = [...new Set(values)].join(" ");
+			node.attributes.class = node.className;
+			mutate("attribute", node, { name: "class", value: node.className });
+			return true;
+		}
 	};
 	const proxy = new Proxy(node, {
 		get(t, p) {
@@ -101,10 +111,23 @@ function wrap(node) {
 			if (p === "tagName" || p === "nodeName") return t.tagName;
 			if (p === "nodeType") return t.nodeType;
 			if (p === "textContent" || p === "innerText") return t.nodeType === 3 ? t.text : t.text + t.children.map(x => wrap(x).textContent).join("");
-			if (p === "parentNode" || p === "parentElement") return wrap(t.parent);
-			if (p === "children" || p === "childNodes") return t.children.map(wrap);
-			if (p === "firstChild" || p === "firstElementChild") return wrap(t.children[0]);
-			if (p === "lastChild" || p === "lastElementChild") return wrap(t.children[t.children.length - 1]);
+			if (p === "parentNode") return wrap(t.parent);
+			if (p === "parentElement") return t.parent?.nodeType === 1 ? wrap(t.parent) : null;
+			if (p === "children") return t.children.filter(child => child.nodeType === 1).map(wrap);
+			if (p === "childNodes") return t.children.map(wrap);
+			if (p === "firstChild") return wrap(t.children[0]);
+			if (p === "lastChild") return wrap(t.children[t.children.length - 1]);
+			if (p === "firstElementChild") return wrap(t.children.find(child => child.nodeType === 1));
+			if (p === "lastElementChild") return wrap([...t.children].reverse().find(child => child.nodeType === 1));
+			if (p === "nextSibling" || p === "previousSibling" || p === "nextElementSibling" || p === "previousElementSibling") {
+				if (!t.parent) return null;
+				const siblings = p.includes("Element") ? t.parent.children.filter(child => child.nodeType === 1) : t.parent.children;
+				const index = siblings.indexOf(t);
+				if (index < 0) return null;
+				return wrap(siblings[index + (p.startsWith("next") ? 1 : -1)]);
+			}
+			if (p === "hasChildNodes") return () => t.children.length > 0;
+			if (p === "nodeValue" || p === "data") return t.nodeType === 3 || t.nodeType === 8 ? t.text : null;
 			if (p === "style") return style;
 			if (p === "classList") return classList;
 			if (p === "isConnected") return t.connected;
