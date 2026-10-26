@@ -393,7 +393,7 @@ class DomBridge {
 	setReflectedProperty(target, message) {
 		this.policy.check();
 		const property = this.policy.checkProperty(message.property, message.value);
-		const attribute = this.policy.checkAttribute(message.attribute, message.kind === "boolean" ? "" : message.value);
+		const attribute = this.policy.checkAttribute(message.attribute, message.kind === "string" ? message.value : "");
 		if (message.kind === "boolean" || message.kind === "stateBoolean") {
 			const value = Boolean(message.value);
 			if (property in target) target[property] = value;
@@ -508,7 +508,7 @@ export class PpermProcess extends EventTarget {
 					snapshot = { id: 1, nodeType: 1, tagName: "BODY", idName: "", className: "", text: "", attributes: {}, styleData: {}, children: [] };
 					this.#nodeIds = new Map();
 				}
-				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-54", import.meta.url));
+				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-55", import.meta.url));
 				this.#worker.addEventListener("message", event => {
 					if (settled || this.#terminated) return;
 					const message = event.data;
