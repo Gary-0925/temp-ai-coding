@@ -2,6 +2,7 @@ let stopped = false;
 let nextId = 1;
 let root = null;
 let documentProxy = null;
+let documentTitle = "";
 const nodes = new Map();
 const listeners = new Map();
 const nodeDataByProxy = new WeakMap();
@@ -1304,8 +1305,8 @@ class PpermDocument {
 	get documentElement() { this._gate.check("dom"); return new PpermNode(root, this._gate); }
 	get nodeType() { this._gate.check("dom"); return 9; }
 	get nodeName() { this._gate.check("dom"); return "#document"; }
-	get title() { this._gate.check("dom"); return ""; }
-	set title(value) { this._gate.check("dom"); emit("documentTitle", { value: String(value) }); }
+	get title() { this._gate.check("dom"); return documentTitle; }
+	set title(value) { this._gate.check("dom"); documentTitle = String(value); emit("documentTitle", { value: documentTitle }); }
 	get documentURI() { this._gate.check("dom"); return ""; }
 	get URL() { this._gate.check("dom"); return ""; }
 	get baseURI() { this._gate.check("dom"); return ""; }
@@ -1335,7 +1336,13 @@ class PpermDocument {
 		this._gate.check("dom");
 		const classes = String(name).trim().split(/\\s+/).filter(Boolean);
 		if (!classes.length) return [];
-		return this.querySelectorAll(classes.map(value => "." + value).join(""));
+		const out = [];
+		const walk = data => {
+			if (data.nodeType === 1 && classes.every(value => data.className.split(/\\s+/).includes(value))) out.push(new PpermNode(data, this._gate));
+			data.children.forEach(walk);
+		};
+		walk(root);
+		return out;
 	}
 
 	getElementsByTagName(name) {
@@ -1426,28 +1433,13 @@ class PpermDocument {
 	getElementsByName(name) {
 		this._gate.check("dom");
 		const value = String(name);
-		return this.querySelectorAll('[name="' + value.replace(/["\\\\]/g, "\\\\class PpermDocument {
-	constructor(gate) {
-		this._gate = gate;
-		return new Proxy(this, {
-			get: (target, property) => {
-				target._gate.check("dom");
-				if (typeof property === "symbol") return Reflect.get(target, property, target);
-				const name = String(property);
-				if (name.startsWith("_") || ["constructor", "__proto__", "prototype"].includes(name)) denied(name);
-				if (property in target) {
-					const value = Reflect.get(target, property, target);
-					return typeof value === "function" ? value.bind(target) : value;
-				}
-				return target._get(property);
-			},
-			set: (target, property, value) => {
-				target._gate.check("dom");
-				if (String(property).startsWith("_") || ["constructor", "__proto__", "prototype"].includes(String(property))) denied(String(property));
-				if (property === "title") { emit("documentTitle", { value: String(value) }); return true; }
-				throw new DOMException("Document property is read-only or unsupported: " + String(property), "NotSupportedError");
-			}
-		});
+		const out = [];
+		const walk = data => {
+			if (data.nodeType === 1 && data.attributes.name === value) out.push(new PpermNode(data, this._gate));
+			data.children.forEach(walk);
+		};
+		walk(root);
+		return out;
 	}
 
 	_get(property) {
@@ -1524,6 +1516,7 @@ self.addEventListener("message", event => {
 			const permissions = message.permissions ?? {};
 			const gate = new PermissionGate(permissions);
 			root = makeData(message.snapshot);
+			documentTitle = String(message.documentTitle ?? "");
 			nextId = Math.max(nextId, ...Array.from(nodes.keys(), id => Number(id) + 1));
 			documentProxy = new PpermDocument(gate);
 			const deniedGlobal = name => new Proxy(function() { gate.check(name); denied(name); }, {
