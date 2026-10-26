@@ -932,7 +932,7 @@ class PpermNode {
 	get classList() { this._gate.check("dom"); return this._classList; }
 	get isConnected() { this._gate.check("dom"); return this._data.connected; }
 	get ownerDocument() { this._gate.check("dom"); return documentProxy; }
-	get attributes() { this._gate.check("dom"); return Object.entries(this._data.attributes).map(([name,value])=>({name,value})); }
+	get attributes() { this._gate.check("dom"); return Object.entries(this._data.attributes).filter(([name]) => !name.toLowerCase().startsWith("on") && !blockedAttributes.has(name.toLowerCase())).map(([name,value])=>({name,value})); }
 	get parentNode() { this._gate.check("dom"); return this._data.parent?new PpermNode(this._data.parent,this._gate):null; }
 	get parentElement() { this._gate.check("dom"); return this._data.parent?.nodeType===1?new PpermNode(this._data.parent,this._gate):null; }
 	get children() { this._gate.check("dom"); return this._data.children.filter(c=>c.nodeType===1).map(c=>new PpermNode(c,this._gate)); }
@@ -1222,8 +1222,8 @@ class PpermNode {
 			const siblings = this._data.parent.children;
 			const index = siblings.indexOf(this._data);
 			new PpermNode(this._data.parent, this._gate).insertBefore(node, siblings[index + 1] ? new PpermNode(siblings[index + 1], this._gate) : null);
-		} else if (where === "afterbegin") this.prepend(value);
-		else if (where === "beforeend") this.append(value);
+		} else if (where === "afterbegin") this.prepend(node);
+		else if (where === "beforeend") this.append(node);
 		else throw new DOMException("Invalid position", "SyntaxError");
 		return node;
 	}
