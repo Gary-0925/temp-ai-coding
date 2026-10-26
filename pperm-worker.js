@@ -160,7 +160,7 @@ class PpermStyle {
 
 	get cssText() {
 		this.#gate.check("dom");
-		return Object.entries(this.#owner.styleData).map(([name, value]) => (name.startsWith("--") ? name : name.replace(/[A-Z]/g, c => "-" + c.toLowerCase())) + ": " + value + ";").join(" ");
+		return Object.entries(this.#owner.styleData).map(([name, value]) => (name.startsWith("--") ? name : name.replace(/[A-Z]/g, c => "-" + c.toLowerCase())) + ": " + value + (this.#owner.stylePriorityData[name] === "important" ? " !important" : "") + ";").join(" ");
 	}
 	set cssText(value) {
 		this.#gate.check("dom");
