@@ -898,8 +898,47 @@ class PpermNode {
 	get previousSibling() { this.#gate.check("dom"); if(!this.#data.parent)return null;const a=this.#data.parent.children,i=a.indexOf(this.#data);return i>0?new PpermNode(a[i-1],this.#gate):null; }
 	get nextElementSibling() { this.#gate.check("dom"); if(!this.#data.parent)return null;const a=this.#data.parent.children.filter(c=>c.nodeType===1),i=a.indexOf(this.#data);return a[i+1]?new PpermNode(a[i+1],this.#gate):null; }
 	get previousElementSibling() { this.#gate.check("dom"); if(!this.#data.parent)return null;const a=this.#data.parent.children.filter(c=>c.nodeType===1),i=a.indexOf(this.#data);return i>0?new PpermNode(a[i-1],this.#gate):null; }
+	getRootNode(options = {}) {
+		this.#gate.check("dom");
+		let node = this.#data;
+		while (node.parent) node = node.parent;
+		return new PpermNode(node, this.#gate);
+	}
+
+	isSameNode(other) {
+		this.#gate.check("dom");
+		return raw(other) === this.#data;
+	}
+
+	isEqualNode(other) {
+		this.#gate.check("dom");
+		const candidate = raw(other);
+		if (!candidate || typeof candidate !== "object") return false;
+		const equal = (left, right) => {
+			if (left.nodeType !== right.nodeType || left.tagName !== right.tagName || left.idName !== right.idName || left.className !== right.className || left.text !== right.text) return false;
+			if (JSON.stringify(left.attributes) !== JSON.stringify(right.attributes) || JSON.stringify(left.styleData) !== JSON.stringify(right.styleData) || left.children.length !== right.children.length) return false;
+			return left.children.every((child, index) => equal(child, right.children[index]));
+		};
+		return equal(this.#data, candidate);
+	}
+
+	compareDocumentPosition(other) {
+		this.#gate.check("dom");
+		const candidate = raw(other);
+		if (!candidate || typeof candidate !== "object" || typeof candidate.nodeType !== "number") return 1 | 32;
+		if (candidate === this.#data) return 0;
+		if (this.contains(other)) return 4 | 16;
+		if (new PpermNode(candidate, this.#gate).contains(this)) return 2 | 8;
+		const rootOf = node => { while (node.parent) node = node.parent; return node; };
+		const leftRoot = rootOf(this.#data), rightRoot = rootOf(candidate);
+		if (leftRoot !== rightRoot) return 1 | 32;
+		const order = [];
+		const walk = node => { order.push(node); node.children.forEach(walk); };
+		walk(leftRoot);
+		return order.indexOf(this.#data) < order.indexOf(candidate) ? 4 : 2;
+	}
+
 	hasChildNodes() { this.#gate.check("dom"); return this.#data.children.length>0; }
-	contains(other) { this.#gate.check("dom"); let n=raw(other);while(n){if(n===this.#data)return true;n=n.parent;}return false; }
 	get href() { this.#gate.check("dom"); return this.#data.attributes.href??""; }
 	set href(value) { this.#gate.check("dom"); const text=String(value);safeAttribute("href",text);this.#data.attributes.href=text;emitMutation(this.#data,"attribute",{name:"href",value:text}); }
 	get src() { this.#gate.check("dom"); return this.#data.attributes.src??""; }
