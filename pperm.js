@@ -166,13 +166,8 @@ function applyDomMessage(message, ids, root) {
 		const child = ids.get(message.childId);
 		if (child?.parentNode === target && child !== root) target.removeChild(child);
 	}
-	else if (message.op === "click" || message.op === "focus" || message.op === "blur") {
-		if (message.op === "click" && target instanceof Element && ["A", "AREA", "FORM", "INPUT"].includes(target.tagName) &&
-			(target.tagName === "FORM" || target.type === "submit" || target.type === "image" || target.href)) {
-			throw new DOMException("Programmatic activation of navigation/submission controls is not permitted", "NotAllowedError");
-		}
-		target[message.op]();
-	}
+	else if (message.op === "click") throw new DOMException("Programmatic clicks are handled inside the Worker and cannot activate host-page event delegation", "NotAllowedError");
+	else if (message.op === "focus" || message.op === "blur") target[message.op]();
 }
 
 export class PpermProcess extends EventTarget {
@@ -239,7 +234,7 @@ export class PpermProcess extends EventTarget {
 					snapshot = { id: 1, nodeType: 1, tagName: "BODY", idName: "", className: "", text: "", attributes: {}, styleData: {}, children: [] };
 					this.#nodeIds = new Map();
 				}
-				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-10", import.meta.url));
+				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-11", import.meta.url));
 				this.#worker.addEventListener("message", event => {
 					if (settled || this.#terminated) return;
 					const message = event.data;
