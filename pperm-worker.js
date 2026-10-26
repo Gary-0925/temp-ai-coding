@@ -93,7 +93,7 @@ function wrap(node) {
 		toggle: (value, force) => { const has = classList.contains(value); if (force === true || (!has && force !== false)) classList.add(value); else if (has) classList.remove(value); return classList.contains(value); },
 		replace: (oldValue, newValue) => {
 			if (!classList.contains(oldValue)) return false;
-			const values = node.className.split(/\\s+/).filter(Boolean);
+			const values = node.className.split(/\s+/).filter(Boolean);
 			const index = values.indexOf(String(oldValue));
 			if (index >= 0) values[index] = String(newValue);
 			node.className = [...new Set(values)].join(" ");
@@ -182,6 +182,11 @@ function wrap(node) {
 			else if (p === "textContent" || p === "innerText") {
 				for (const child of t.children) { child.parent = null; setConnected(child, false); }
 				t.children = [];
+				t.text = String(value);
+				mutate("text", t, { value: t.text });
+			}
+			else if (p === "nodeValue" || p === "data") {
+				if (t.nodeType !== 3 && t.nodeType !== 8) return true;
 				t.text = String(value);
 				mutate("text", t, { value: t.text });
 			}
