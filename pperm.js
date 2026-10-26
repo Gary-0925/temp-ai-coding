@@ -157,26 +157,14 @@ export class PpermProcess extends EventTarget {
 						else if (message.type === "dom") {
 							if (!this.#root) throw new DOMException("DOM permission is not enabled", "NotAllowedError");
 							applyDomMessage(message, this.#nodeIds, this.#root);
-						} else if (message.type === "listen") {
-							const target = this.#nodeIds.get(message.id);
-							if (!target) return;
-							const handler = nativeEvent => {
-								if (this.#terminated || !this.#worker) return;
-								this.#worker.postMessage({
-									type: "event",
-									listenerId: message.listenerId,
-									event: { type: nativeEvent.type, detail: nativeEvent.detail ?? null }
-								});
-								if (message.once) target.removeEventListener(message.eventType, handler);
-							};
-							target.addEventListener(message.eventType, handler, { once: !!message.once });
-							this.#domListeners.push({ target, type: message.eventType, handler });
-						} else if (message.type === "unlisten") {
+							const pending = this.#pendingListeners.splice(0);
+							for (const item of pending) this.#attachListener(item);
+						} else if (message.type === "listen") this.#attachListener(message);
+						else if (message.type === "unlisten") {
 							for (const entry of this.#domListeners) {
-								if (entry.target === this.#nodeIds.get(message.id) && entry.type === message.eventType) {
-									entry.target.removeEventListener(entry.type, entry.handler);
-								}
+								if (entry.listenerId === message.listenerId) entry.target.removeEventListener(entry.type, entry.handler);
 							}
+							this.#domListeners = this.#domListeners.filter(entry => entry.listenerId !== message.listenerId);
 						} else if (message.type === "documentTitle") document.title = message.value;
 						else if (message.type === "done") finish(null, message.value);
 						else if (message.type === "error") {
@@ -213,6 +201,25 @@ export class PpermProcess extends EventTarget {
 	}
 
 	#domListeners = [];
+	#pendingListeners = [];
+
+	#attachListener(message) {
+		const target = this.#nodeIds.get(message.id);
+		if (!target) {
+			this.#pendingListeners.push(message);
+			return;
+		}
+		const handler = nativeEvent => {
+			if (this.#terminated || !this.#worker) return;
+			this.#worker.postMessage({
+				type: "event",
+				listenerId: message.listenerId,
+				event: { type: nativeEvent.type, detail: nativeEvent.detail ?? null }
+			});
+		};
+		target.addEventListener(message.eventType, handler, { once: !!message.once });
+		this.#domListeners.push({ target, type: message.eventType, handler, listenerId: message.listenerId });
+	}
 
 	postMessage(value) {
 		if (this.#terminated) throw new DOMException("Process has been terminated", "AbortError");
@@ -231,6 +238,7 @@ export class PpermProcess extends EventTarget {
 			entry.target.removeEventListener(entry.type, entry.handler);
 		}
 		this.#domListeners = [];
+		this.#pendingListeners = [];
 		this.#resolveTermination();
 		this.#finish?.(new DOMException("Process has been terminated", "AbortError"));
 		this.dispatchEvent(new Event("terminate"));
