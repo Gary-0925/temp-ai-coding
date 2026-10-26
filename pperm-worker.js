@@ -1076,11 +1076,15 @@ class PpermNode {
 	get checked() { this.#gate.check("dom"); return this.#data.checked ?? Object.hasOwn(this.#data.attributes, "checked"); }
 	set checked(value) { this.#gate.check("dom"); this.#data.checked=Boolean(value);emitMutation(this.#data,"property",{property:"checked",value:this.#data.checked}); }
 	get disabled() { this.#gate.check("dom"); return this.#data.disabled ?? Object.hasOwn(this.#data.attributes, "disabled"); }
-	set disabled(value) { this.#gate.check("dom"); this.#data.disabled=Boolean(value);emitMutation(this.#data,"property",{property:"disabled",value:this.#data.disabled}); }
+	set disabled(value) { this.#gate.check("dom"); this.#data.disabled = Boolean(value); if (this.#data.disabled) this.#data.attributes.disabled = ""; else delete this.#data.attributes.disabled; emitMutation(this.#data, "property", { property: "disabled", value: this.#data.disabled }); }
 	get name() { this.#gate.check("dom"); return this.#data.attributes.name??""; }
 	set name(value) { this.#gate.check("dom"); const text=String(value);this.#data.attributes.name=text;emitMutation(this.#data,"attribute",{name:"name",value:text}); }
 	get type() { this.#gate.check("dom"); return this.#data.attributes.type??""; }
 	set type(value) { this.#gate.check("dom"); const text=String(value);this.#data.attributes.type=text;emitMutation(this.#data,"attribute",{name:"type",value:text}); }
+	get defaultValue() { this.#gate.check("dom"); return this.#data.attributes.value ?? ""; }
+	set defaultValue(value) { this.#gate.check("dom"); this.setAttribute("value", value); }
+	get defaultSelected() { this.#gate.check("dom"); return Object.hasOwn(this.#data.attributes, "selected"); }
+	set defaultSelected(value) { this.#gate.check("dom"); if (value) this.#data.attributes.selected = ""; else delete this.#data.attributes.selected; emitMutation(this.#data, value ? "attribute" : "removeAttribute", value ? { name: "selected", value: "" } : { name: "selected" }); }
 
 	get accessKey() { this.#gate.check("dom"); return this.#data.attributes["accesskey"] ?? ""; }
 	set accessKey(value) { this.#gate.check("dom"); const text = String(value); safeAttribute("accesskey", text); this.#data.attributes["accesskey"] = text; emitMutation(this.#data, "attribute", { name: "accesskey", value: text }); }
@@ -1156,8 +1160,8 @@ class PpermNode {
 	set required(value) { this.#gate.check("dom"); if (value) this.#data.attributes["required"] = ""; else delete this.#data.attributes["required"]; emitMutation(this.#data, value ? "attribute" : "removeAttribute", value ? { name: "required", value: "" } : { name: "required" }); }
 	get readOnly() { this.#gate.check("dom"); return Object.hasOwn(this.#data.attributes, "readonly"); }
 	set readOnly(value) { this.#gate.check("dom"); if (value) this.#data.attributes["readonly"] = ""; else delete this.#data.attributes["readonly"]; emitMutation(this.#data, value ? "attribute" : "removeAttribute", value ? { name: "readonly", value: "" } : { name: "readonly" }); }
-	get selected() { this.#gate.check("dom"); return Object.hasOwn(this.#data.attributes, "selected"); }
-	set selected(value) { this.#gate.check("dom"); if (value) this.#data.attributes["selected"] = ""; else delete this.#data.attributes["selected"]; emitMutation(this.#data, value ? "attribute" : "removeAttribute", value ? { name: "selected", value: "" } : { name: "selected" }); }
+	get selected() { this.#gate.check("dom"); return this.#data.selected ?? Object.hasOwn(this.#data.attributes, "selected"); }
+	set selected(value) { this.#gate.check("dom"); this.#data.selected = Boolean(value); emitMutation(this.#data, "property", { property: "selected", value: this.#data.selected }); }
 	get autofocus() { this.#gate.check("dom"); return Object.hasOwn(this.#data.attributes, "autofocus"); }
 	set autofocus(value) { this.#gate.check("dom"); if (value) this.#data.attributes["autofocus"] = ""; else delete this.#data.attributes["autofocus"]; emitMutation(this.#data, value ? "attribute" : "removeAttribute", value ? { name: "autofocus", value: "" } : { name: "autofocus" }); }
 	get controls() { this.#gate.check("dom"); return Object.hasOwn(this.#data.attributes, "controls"); }
@@ -2028,6 +2032,7 @@ class PpermNode {
 		this.#data.attributes[safeName] = text;
 		if (safeName === "id") this.#data.idName = text;
 		if (safeName === "class") this.#data.className = text;
+		if (safeName === "disabled") this.#data.disabled = true;
 		emitMutation(this.#data, "attribute", { name: safeName, value: text });
 	}
 
@@ -2038,6 +2043,7 @@ class PpermNode {
 		delete this.#data.attributes[safeName];
 		if (safeName === "id") this.#data.idName = "";
 		if (safeName === "class") this.#data.className = "";
+		if (safeName === "disabled") this.#data.disabled = false;
 		emitMutation(this.#data, "removeAttribute", { name: safeName });
 	}
 
