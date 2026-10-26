@@ -227,6 +227,7 @@ class DomBridge {
 			case "attribute": return this.setAttribute(target, message);
 			case "removeAttribute": return this.removeAttribute(target, message);
 			case "property": return this.setProperty(target, message);
+			case "reflectedProperty": return this.setReflectedProperty(target, message);
 			case "append": return this.appendChild(target, message, ids);
 			case "insert": return this.insertBefore(target, message, ids);
 			case "remove": return this.removeChild(target, message, ids, root);
@@ -303,6 +304,22 @@ class DomBridge {
 			throw new DOMException("DOM property value must be a serializable primitive", "NotAllowedError");
 		}
 		target[property] = message.value;
+	}
+
+	setReflectedProperty(target, message) {
+		this.policy.check();
+		const property = this.policy.checkProperty(message.property, message.value);
+		const attribute = this.policy.checkAttribute(message.attribute, message.kind === "boolean" ? "" : message.value);
+		if (message.kind === "boolean") {
+			const value = Boolean(message.value);
+			if (property in target) target[property] = value;
+			else if (value) target.setAttribute(attribute, "");
+			else target.removeAttribute(attribute);
+			return;
+		}
+		const value = String(message.value);
+		if (property in target) target[property] = value;
+		else target.setAttribute(attribute, value);
 	}
 
 	appendChild(target, message, ids) {
@@ -407,7 +424,7 @@ export class PpermProcess extends EventTarget {
 					snapshot = { id: 1, nodeType: 1, tagName: "BODY", idName: "", className: "", text: "", attributes: {}, styleData: {}, children: [] };
 					this.#nodeIds = new Map();
 				}
-				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-37", import.meta.url));
+				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-38", import.meta.url));
 				this.#worker.addEventListener("message", event => {
 					if (settled || this.#terminated) return;
 					const message = event.data;
