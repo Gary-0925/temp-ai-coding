@@ -339,10 +339,16 @@ class PpermNode {
 			case "getBoundingClientRect": return () => this.getBoundingClientRect();
 			case "dispatchEvent": return event => this.dispatchEvent(event);
 			case "attributes": return Object.entries(d.attributes).map(([name, value]) => ({ name, value }));
-			case "innerHTML": case "outerHTML": case "srcdoc": case "insertAdjacentHTML": case "setHTMLUnsafe": case "setHTML":
-				return () => denied(property);
+			case "innerHTML": case "outerHTML": case "srcdoc": case "outerText":
+				denied(property);
+			case "insertAdjacentHTML": case "setHTMLUnsafe": case "setHTML":
+				return (...args) => { this._gate.check("dom"); denied(property); };
 			default:
 				if (/^on[a-z]+$/i.test(String(property))) return this._eventProperties.get(String(property)) ?? null;
+				if (Object.hasOwn(d, String(property)) &&
+					!["id", "idName", "className", "text", "attributes", "styleData", "parent", "children", "connected"].includes(String(property))) {
+					return d[String(property)];
+				}
 				if (Object.hasOwn(d.attributes, String(property).toLowerCase())) return d.attributes[String(property).toLowerCase()];
 				return undefined;
 		}
