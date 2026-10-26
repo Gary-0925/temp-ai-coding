@@ -163,6 +163,30 @@ class PpermTokenList {
 	constructor(owner, gate) {
 		this.owner = owner;
 		this.gate = gate;
+		return new Proxy(this, {
+			get: (target, property) => {
+				target.gate.check("dom");
+				if (typeof property === "symbol") return Reflect.get(target, property, target);
+				const name = String(property);
+				if (name.startsWith("_") || ["owner", "gate", "constructor", "__proto__", "prototype"].includes(name)) denied(name);
+				if (property in target) {
+					const value = Reflect.get(target, property, target);
+					return typeof value === "function" ? value.bind(target) : value;
+				}
+				return undefined;
+			},
+			set: (target, property, value) => {
+				target.gate.check("dom");
+				if (String(property).startsWith("_") || ["owner", "gate", "constructor", "__proto__", "prototype"].includes(String(property))) denied(String(property));
+				if (property === "value") {
+					target.owner.className = String(value);
+					target.owner.attributes.class = target.owner.className;
+					emitMutation(target.owner, "attribute", { name: "class", value: target.owner.className });
+					return true;
+				}
+				denied(String(property));
+			}
+		});
 	}
 
 	_values() {
