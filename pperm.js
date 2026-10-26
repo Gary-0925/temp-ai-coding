@@ -91,10 +91,13 @@ function snapshotNode(node, ids, state) {
 		}
 	}
 	const styleData = {};
+	const stylePriorityData = {};
 	if (node.nodeType === 1) {
 		for (let i = 0; i < node.style.length; i++) {
 			const name = node.style[i];
-			styleData[name.startsWith("--") ? name : name.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = node.style.getPropertyValue(name);
+			const key = name.startsWith("--") ? name : name.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+			styleData[key] = node.style.getPropertyValue(name);
+			stylePriorityData[key] = node.style.getPropertyPriority(name);
 		}
 	}
 	return {
@@ -106,6 +109,7 @@ function snapshotNode(node, ids, state) {
 		text: node.nodeType === 3 || node.nodeType === 8 ? node.nodeValue ?? "" : "",
 		attributes,
 		styleData,
+		stylePriorityData,
 		value: node.nodeType === 1 && "value" in node ? node.value : undefined,
 		checked: node.nodeType === 1 && "checked" in node ? node.checked : undefined,
 		disabled: node.nodeType === 1 && "disabled" in node ? node.disabled : undefined,
@@ -146,7 +150,13 @@ function createNativeNode(data, ids) {
 			}
 		}
 		for (const [name, value] of Object.entries(data.styleData ?? {})) {
-			try { node.style[assertSafeStyle(name, value)] = String(value); } catch (error) {
+			try {
+				const property = name.startsWith("--") ? name : name.replace(/[A-Z]/g, character => "-" + character.toLowerCase());
+				const safeName = assertSafeStyle(property, value);
+				const priority = String(data.stylePriorityData?.[name] ?? "");
+				if (priority && priority.toLowerCase() !== "important") throw new TypeError("Invalid CSS priority");
+				node.style.setProperty(safeName, String(value), priority);
+			} catch (error) {
 				if (error?.name === "NotAllowedError") throw error;
 			}
 		}
@@ -498,7 +508,7 @@ export class PpermProcess extends EventTarget {
 					snapshot = { id: 1, nodeType: 1, tagName: "BODY", idName: "", className: "", text: "", attributes: {}, styleData: {}, children: [] };
 					this.#nodeIds = new Map();
 				}
-				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-49", import.meta.url));
+				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-50", import.meta.url));
 				this.#worker.addEventListener("message", event => {
 					if (settled || this.#terminated) return;
 					const message = event.data;
