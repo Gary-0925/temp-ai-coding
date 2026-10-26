@@ -229,6 +229,7 @@ class DomBridge {
 			case "styleText": return this.setStyleText(target, message);
 			case "styleSetProperty": return this.setStyleProperty(target, message);
 			case "styleRemoveProperty": return this.removeStyleProperty(target, message);
+			case "classList": return this.setClassList(target, message);
 			case "attribute": return this.setAttribute(target, message);
 			case "removeAttribute": return this.removeAttribute(target, message);
 			case "formProperty": return this.setFormProperty(target, message);
@@ -313,6 +314,30 @@ class DomBridge {
 		this.policy.check();
 		const property = this.policy.checkStyle(message.property, "");
 		target.style.removeProperty(property);
+	}
+
+	setClassList(target, message) {
+		this.policy.check();
+		const method = String(message.method);
+		if (!["add", "remove", "toggle", "replace"].includes(method)) {
+			throw new DOMException("Unsupported classList operation: " + method, "NotAllowedError");
+		}
+		const args = message.args;
+		if (!Array.isArray(args) || args.length > 256 || args.some(value => typeof value !== "string" && typeof value !== "boolean")) {
+			throw new TypeError("Invalid classList arguments");
+		}
+		const expected = method === "replace" ? 2 : method === "toggle" ? [1, 2] : null;
+		if (method === "replace" && args.length !== expected) throw new TypeError("replace expects two tokens");
+		if (method === "toggle" && (args.length < expected[0] || args.length > expected[1])) throw new TypeError("toggle expects a token and optional force");
+		if ((method === "add" || method === "remove") && args.some(value => typeof value !== "string")) throw new TypeError("classList tokens must be strings");
+		if (method === "toggle" && (typeof args[0] !== "string" || (args.length === 2 && typeof args[1] !== "boolean"))) throw new TypeError("Invalid toggle arguments");
+		if (method === "replace" && args.some(value => typeof value !== "string")) throw new TypeError("replace tokens must be strings");
+		const tokens = method === "toggle" ? [args[0]] : args;
+		for (const token of tokens) {
+			if (token === "") throw new DOMException("The token must not be empty", "SyntaxError");
+			if (/\s/.test(token)) throw new DOMException("The token must not contain whitespace", "InvalidCharacterError");
+		}
+		target.classList[method](...args);
 	}
 
 	setAttribute(target, message) {
@@ -465,7 +490,7 @@ export class PpermProcess extends EventTarget {
 					snapshot = { id: 1, nodeType: 1, tagName: "BODY", idName: "", className: "", text: "", attributes: {}, styleData: {}, children: [] };
 					this.#nodeIds = new Map();
 				}
-				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-45", import.meta.url));
+				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-46", import.meta.url));
 				this.#worker.addEventListener("message", event => {
 					if (settled || this.#terminated) return;
 					const message = event.data;
