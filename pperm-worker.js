@@ -217,11 +217,19 @@ class PpermTokenList {
 		return this.#owner.className.split(/\s+/).filter(Boolean);
 	}
 
-	_commit(values) {
+	_commit(values, method, args) {
 		this.#gate.check("dom");
 		this.#owner.className = [...new Set(values)].join(" ");
 		this.#owner.attributes.class = this.#owner.className;
-		emitMutation(this.#owner, "attribute", { name: "class", value: this.#owner.className });
+		emitMutation(this.#owner, "classList", { method, args });
+	}
+
+	_validateTokens(values) {
+		this.#gate.check("dom");
+		for (const value of values) {
+			if (value === "") throw new DOMException("The token must not be empty", "SyntaxError");
+			if (/\s/.test(value)) throw new DOMException("The token must not contain whitespace", "InvalidCharacterError");
+		}
 	}
 
 	get length() { this.#gate.check("dom"); return this._values().length; }
@@ -269,26 +277,33 @@ class PpermTokenList {
 
 	remove(...values) {
 		this.#gate.check("dom");
-		const removeSet = new Set(values.map(String));
-		this._commit(this._values().filter(value => !removeSet.has(value)));
+		const tokens = values.map(String);
+		this._validateTokens(tokens);
+		const removeSet = new Set(tokens);
+		this._commit(this._values().filter(value => !removeSet.has(value)), "remove", tokens);
 	}
 
 	toggle(value, force) {
 		this.#gate.check("dom");
+		const token = String(value);
+		this._validateTokens([token]);
+		if (force !== undefined && typeof force !== "boolean") throw new TypeError("The force argument must be a boolean");
 		const values = this._values();
-		const has = values.includes(String(value));
-		if (force === true || (!has && force !== false)) this._commit([...values, String(value)]);
-		else if (has) this._commit(values.filter(item => item !== String(value)));
-		return this._values().includes(String(value));
+		const has = values.includes(token);
+		if (force === true || (!has && force !== false)) this._commit([...values, token], "toggle", force === undefined ? [token] : [token, force]);
+		else if (has && force !== true) this._commit(values.filter(item => item !== token), "toggle", force === undefined ? [token] : [token, force]);
+		return this._values().includes(token);
 	}
 
 	replace(oldValue, newValue) {
 		this.#gate.check("dom");
+		const oldToken = String(oldValue), newToken = String(newValue);
+		this._validateTokens([oldToken, newToken]);
 		const values = this._values();
-		const index = values.indexOf(String(oldValue));
+		const index = values.indexOf(oldToken);
 		if (index < 0) return false;
-		values[index] = String(newValue);
-		this._commit(values);
+		values[index] = newToken;
+		this._commit(values, "replace", [oldToken, newToken]);
 		return true;
 	}
 
