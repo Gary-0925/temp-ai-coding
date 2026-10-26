@@ -1624,7 +1624,18 @@ class PpermDocument {
 
 	getElementById(id) {
 		this.#gate.check("dom");
-		return this.querySelector("#" + String(id));
+		const value = String(id);
+		let result = null;
+		const walk = data => {
+			if (result) return;
+			if (data.nodeType === 1 && data.idName === value) {
+				result = new PpermNode(data, this.#gate);
+				return;
+			}
+			data.children.forEach(walk);
+		};
+		walk(root);
+		return result;
 	}
 
 	getElementsByClassName(name) {
