@@ -23,10 +23,12 @@ const blockedElementNames = new Set([
 	"base", "meta", "link", "style", "svg", "math", "portal", "fencedframe",
 	"webview"
 ]);
-const safePropertyNames = new Set([
-	"value", "checked", "disabled", "title", "hidden", "name", "type",
-	"href", "src", "alt", "tabIndex", "role", "draggable", "contentEditable"
+const blockedPropertyNames = new Set([
+	"innerHTML", "outerHTML", "srcdoc", "insertAdjacentHTML", "setHTMLUnsafe",
+	"setHTML", "outerText", "innerText", "__proto__", "prototype", "constructor",
+	"formAction", "action"
 ]);
+const urlPropertyNames = new Set(["href", "src", "poster", "cite", "background", "data", "manifest"]);
 const urlAttributeNames = new Set([
 	"href", "src", "action", "formaction", "poster", "cite", "xlink:href",
 	"background", "data", "manifest"
@@ -58,10 +60,10 @@ function assertSafeAttribute(name, value) {
 
 function assertSafeProperty(name, value) {
 	name = String(name);
-	if (!safePropertyNames.has(name)) {
+	if (blockedPropertyNames.has(name) || name.startsWith("__") || /^on[a-z]+$/i.test(name)) {
 		throw new DOMException("DOM property is not permitted by the bridge: " + name, "NotAllowedError");
 	}
-	if (name === "href" || name === "src") assertSafeAttribute(name, value);
+	if (urlPropertyNames.has(name)) assertSafeAttribute(name.toLowerCase(), value);
 	return name;
 }
 
@@ -156,7 +158,13 @@ function applyDomMessage(message, ids, root) {
 		}
 		target.removeAttribute(name);
 	}
-	else if (message.op === "property") target[assertSafeProperty(message.property, message.value)] = message.value;
+	else if (message.op === "property") {
+		const property = assertSafeProperty(message.property, message.value);
+		if (typeof message.value === "function" || (message.value !== null && typeof message.value === "object")) {
+			throw new DOMException("DOM property value must be a serializable primitive", "NotAllowedError");
+		}
+		target[property] = message.value;
+	}
 	else if (message.op === "append") target.appendChild(createNativeNode(message.child, ids));
 	else if (message.op === "insert") {
 		const before = ids.get(message.beforeId) ?? null;
@@ -234,7 +242,7 @@ export class PpermProcess extends EventTarget {
 					snapshot = { id: 1, nodeType: 1, tagName: "BODY", idName: "", className: "", text: "", attributes: {}, styleData: {}, children: [] };
 					this.#nodeIds = new Map();
 				}
-				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-11", import.meta.url));
+				this.#worker = new Worker(new URL("./pperm-worker.js?v=20261026-12", import.meta.url));
 				this.#worker.addEventListener("message", event => {
 					if (settled || this.#terminated) return;
 					const message = event.data;
