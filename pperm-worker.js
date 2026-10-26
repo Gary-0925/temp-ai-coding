@@ -966,8 +966,8 @@ class PpermNode {
 	get type() { this._gate.check("dom"); return this._data.attributes.type??""; }
 	set type(value) { this._gate.check("dom"); const text=String(value);this._data.attributes.type=text;emitMutation(this._data,"attribute",{name:"type",value:text}); }
 
-	get accessKey() { this._gate.check("dom"); return this._data.attributes["access-key"] ?? ""; }
-	set accessKey(value) { this._gate.check("dom"); const text = String(value); safeAttribute("access-key", text); this._data.attributes["access-key"] = text; emitMutation(this._data, "attribute", { name: "access-key", value: text }); }
+	get accessKey() { this._gate.check("dom"); return this._data.attributes["accesskey"] ?? ""; }
+	set accessKey(value) { this._gate.check("dom"); const text = String(value); safeAttribute("accesskey", text); this._data.attributes["accesskey"] = text; emitMutation(this._data, "attribute", { name: "accesskey", value: text }); }
 	get accept() { this._gate.check("dom"); return this._data.attributes["accept"] ?? ""; }
 	set accept(value) { this._gate.check("dom"); const text = String(value); safeAttribute("accept", text); this._data.attributes["accept"] = text; emitMutation(this._data, "attribute", { name: "accept", value: text }); }
 	get alt() { this._gate.check("dom"); return this._data.attributes["alt"] ?? ""; }
@@ -978,52 +978,42 @@ class PpermNode {
 	set capture(value) { this._gate.check("dom"); const text = String(value); safeAttribute("capture", text); this._data.attributes["capture"] = text; emitMutation(this._data, "attribute", { name: "capture", value: text }); }
 	get cite() { this._gate.check("dom"); return this._data.attributes["cite"] ?? ""; }
 	set cite(value) { this._gate.check("dom"); const text = String(value); safeAttribute("cite", text); this._data.attributes["cite"] = text; emitMutation(this._data, "attribute", { name: "cite", value: text }); }
-	get cols() { this._gate.check("dom"); return this._data.attributes["cols"] ?? ""; }
-	set cols(value) { this._gate.check("dom"); const text = String(value); safeAttribute("cols", text); this._data.attributes["cols"] = text; emitMutation(this._data, "attribute", { name: "cols", value: text }); }
-	get contentEditable() { this._gate.check("dom"); return this._data.attributes["content-editable"] ?? ""; }
-	set contentEditable(value) { this._gate.check("dom"); const text = String(value); safeAttribute("content-editable", text); this._data.attributes["content-editable"] = text; emitMutation(this._data, "attribute", { name: "content-editable", value: text }); }
-	get crossOrigin() { this._gate.check("dom"); return this._data.attributes["cross-origin"] ?? ""; }
-	set crossOrigin(value) { this._gate.check("dom"); const text = String(value); safeAttribute("cross-origin", text); this._data.attributes["cross-origin"] = text; emitMutation(this._data, "attribute", { name: "cross-origin", value: text }); }
+	get contentEditable() { this._gate.check("dom"); return this._data.attributes["contenteditable"] ?? ""; }
+	set contentEditable(value) { this._gate.check("dom"); const text = String(value); safeAttribute("contenteditable", text); this._data.attributes["contenteditable"] = text; emitMutation(this._data, "attribute", { name: "contenteditable", value: text }); }
+	get crossOrigin() { this._gate.check("dom"); return this._data.attributes["crossorigin"] ?? ""; }
+	set crossOrigin(value) { this._gate.check("dom"); const text = String(value); safeAttribute("crossorigin", text); this._data.attributes["crossorigin"] = text; emitMutation(this._data, "attribute", { name: "crossorigin", value: text }); }
 	get dir() { this._gate.check("dom"); return this._data.attributes["dir"] ?? ""; }
 	set dir(value) { this._gate.check("dom"); const text = String(value); safeAttribute("dir", text); this._data.attributes["dir"] = text; emitMutation(this._data, "attribute", { name: "dir", value: text }); }
 	get draggable() { this._gate.check("dom"); return this._data.attributes["draggable"] ?? ""; }
 	set draggable(value) { this._gate.check("dom"); const text = String(value); safeAttribute("draggable", text); this._data.attributes["draggable"] = text; emitMutation(this._data, "attribute", { name: "draggable", value: text }); }
-	get enterKeyHint() { this._gate.check("dom"); return this._data.attributes["enter-key-hint"] ?? ""; }
-	set enterKeyHint(value) { this._gate.check("dom"); const text = String(value); safeAttribute("enter-key-hint", text); this._data.attributes["enter-key-hint"] = text; emitMutation(this._data, "attribute", { name: "enter-key-hint", value: text }); }
-	get formEnctype() { this._gate.check("dom"); return this._data.attributes["form-enctype"] ?? ""; }
-	set formEnctype(value) { this._gate.check("dom"); const text = String(value); safeAttribute("form-enctype", text); this._data.attributes["form-enctype"] = text; emitMutation(this._data, "attribute", { name: "form-enctype", value: text }); }
-	get formMethod() { this._gate.check("dom"); return this._data.attributes["form-method"] ?? ""; }
-	set formMethod(value) { this._gate.check("dom"); const text = String(value); safeAttribute("form-method", text); this._data.attributes["form-method"] = text; emitMutation(this._data, "attribute", { name: "form-method", value: text }); }
-	get formTarget() { this._gate.check("dom"); return this._data.attributes["form-target"] ?? ""; }
-	set formTarget(value) { this._gate.check("dom"); const text = String(value); safeAttribute("form-target", text); this._data.attributes["form-target"] = text; emitMutation(this._data, "attribute", { name: "form-target", value: text }); }
-	get htmlFor() { this._gate.check("dom"); return this._data.attributes["html-for"] ?? ""; }
-	set htmlFor(value) { this._gate.check("dom"); const text = String(value); safeAttribute("html-for", text); this._data.attributes["html-for"] = text; emitMutation(this._data, "attribute", { name: "html-for", value: text }); }
-	get inputMode() { this._gate.check("dom"); return this._data.attributes["input-mode"] ?? ""; }
-	set inputMode(value) { this._gate.check("dom"); const text = String(value); safeAttribute("input-mode", text); this._data.attributes["input-mode"] = text; emitMutation(this._data, "attribute", { name: "input-mode", value: text }); }
+	get enterKeyHint() { this._gate.check("dom"); return this._data.attributes["enterkeyhint"] ?? ""; }
+	set enterKeyHint(value) { this._gate.check("dom"); const text = String(value); safeAttribute("enterkeyhint", text); this._data.attributes["enterkeyhint"] = text; emitMutation(this._data, "attribute", { name: "enterkeyhint", value: text }); }
+	get formEnctype() { this._gate.check("dom"); return this._data.attributes["formenctype"] ?? ""; }
+	set formEnctype(value) { this._gate.check("dom"); const text = String(value); safeAttribute("formenctype", text); this._data.attributes["formenctype"] = text; emitMutation(this._data, "attribute", { name: "formenctype", value: text }); }
+	get formMethod() { this._gate.check("dom"); return this._data.attributes["formmethod"] ?? ""; }
+	set formMethod(value) { this._gate.check("dom"); const text = String(value); safeAttribute("formmethod", text); this._data.attributes["formmethod"] = text; emitMutation(this._data, "attribute", { name: "formmethod", value: text }); }
+	get formTarget() { this._gate.check("dom"); return this._data.attributes["formtarget"] ?? ""; }
+	set formTarget(value) { this._gate.check("dom"); const text = String(value); safeAttribute("formtarget", text); this._data.attributes["formtarget"] = text; emitMutation(this._data, "attribute", { name: "formtarget", value: text }); }
+	get htmlFor() { this._gate.check("dom"); return this._data.attributes["for"] ?? ""; }
+	set htmlFor(value) { this._gate.check("dom"); const text = String(value); safeAttribute("for", text); this._data.attributes["for"] = text; emitMutation(this._data, "attribute", { name: "for", value: text }); }
+	get inputMode() { this._gate.check("dom"); return this._data.attributes["inputmode"] ?? ""; }
+	set inputMode(value) { this._gate.check("dom"); const text = String(value); safeAttribute("inputmode", text); this._data.attributes["inputmode"] = text; emitMutation(this._data, "attribute", { name: "inputmode", value: text }); }
 	get lang() { this._gate.check("dom"); return this._data.attributes["lang"] ?? ""; }
 	set lang(value) { this._gate.check("dom"); const text = String(value); safeAttribute("lang", text); this._data.attributes["lang"] = text; emitMutation(this._data, "attribute", { name: "lang", value: text }); }
 	get max() { this._gate.check("dom"); return this._data.attributes["max"] ?? ""; }
 	set max(value) { this._gate.check("dom"); const text = String(value); safeAttribute("max", text); this._data.attributes["max"] = text; emitMutation(this._data, "attribute", { name: "max", value: text }); }
-	get maxLength() { this._gate.check("dom"); return this._data.attributes["max-length"] ?? ""; }
-	set maxLength(value) { this._gate.check("dom"); const text = String(value); safeAttribute("max-length", text); this._data.attributes["max-length"] = text; emitMutation(this._data, "attribute", { name: "max-length", value: text }); }
 	get media() { this._gate.check("dom"); return this._data.attributes["media"] ?? ""; }
 	set media(value) { this._gate.check("dom"); const text = String(value); safeAttribute("media", text); this._data.attributes["media"] = text; emitMutation(this._data, "attribute", { name: "media", value: text }); }
 	get min() { this._gate.check("dom"); return this._data.attributes["min"] ?? ""; }
 	set min(value) { this._gate.check("dom"); const text = String(value); safeAttribute("min", text); this._data.attributes["min"] = text; emitMutation(this._data, "attribute", { name: "min", value: text }); }
-	get minLength() { this._gate.check("dom"); return this._data.attributes["min-length"] ?? ""; }
-	set minLength(value) { this._gate.check("dom"); const text = String(value); safeAttribute("min-length", text); this._data.attributes["min-length"] = text; emitMutation(this._data, "attribute", { name: "min-length", value: text }); }
 	get placeholder() { this._gate.check("dom"); return this._data.attributes["placeholder"] ?? ""; }
 	set placeholder(value) { this._gate.check("dom"); const text = String(value); safeAttribute("placeholder", text); this._data.attributes["placeholder"] = text; emitMutation(this._data, "attribute", { name: "placeholder", value: text }); }
-	get referrerPolicy() { this._gate.check("dom"); return this._data.attributes["referrer-policy"] ?? ""; }
-	set referrerPolicy(value) { this._gate.check("dom"); const text = String(value); safeAttribute("referrer-policy", text); this._data.attributes["referrer-policy"] = text; emitMutation(this._data, "attribute", { name: "referrer-policy", value: text }); }
+	get referrerPolicy() { this._gate.check("dom"); return this._data.attributes["referrerpolicy"] ?? ""; }
+	set referrerPolicy(value) { this._gate.check("dom"); const text = String(value); safeAttribute("referrerpolicy", text); this._data.attributes["referrerpolicy"] = text; emitMutation(this._data, "attribute", { name: "referrerpolicy", value: text }); }
 	get rel() { this._gate.check("dom"); return this._data.attributes["rel"] ?? ""; }
 	set rel(value) { this._gate.check("dom"); const text = String(value); safeAttribute("rel", text); this._data.attributes["rel"] = text; emitMutation(this._data, "attribute", { name: "rel", value: text }); }
 	get role() { this._gate.check("dom"); return this._data.attributes["role"] ?? ""; }
 	set role(value) { this._gate.check("dom"); const text = String(value); safeAttribute("role", text); this._data.attributes["role"] = text; emitMutation(this._data, "attribute", { name: "role", value: text }); }
-	get rows() { this._gate.check("dom"); return this._data.attributes["rows"] ?? ""; }
-	set rows(value) { this._gate.check("dom"); const text = String(value); safeAttribute("rows", text); this._data.attributes["rows"] = text; emitMutation(this._data, "attribute", { name: "rows", value: text }); }
-	get rowSpan() { this._gate.check("dom"); return this._data.attributes["row-span"] ?? ""; }
-	set rowSpan(value) { this._gate.check("dom"); const text = String(value); safeAttribute("row-span", text); this._data.attributes["row-span"] = text; emitMutation(this._data, "attribute", { name: "row-span", value: text }); }
 	get scope() { this._gate.check("dom"); return this._data.attributes["scope"] ?? ""; }
 	set scope(value) { this._gate.check("dom"); const text = String(value); safeAttribute("scope", text); this._data.attributes["scope"] = text; emitMutation(this._data, "attribute", { name: "scope", value: text }); }
 	get slot() { this._gate.check("dom"); return this._data.attributes["slot"] ?? ""; }
@@ -1032,8 +1022,6 @@ class PpermNode {
 	set spellcheck(value) { this._gate.check("dom"); const text = String(value); safeAttribute("spellcheck", text); this._data.attributes["spellcheck"] = text; emitMutation(this._data, "attribute", { name: "spellcheck", value: text }); }
 	get step() { this._gate.check("dom"); return this._data.attributes["step"] ?? ""; }
 	set step(value) { this._gate.check("dom"); const text = String(value); safeAttribute("step", text); this._data.attributes["step"] = text; emitMutation(this._data, "attribute", { name: "step", value: text }); }
-	get tabIndex() { this._gate.check("dom"); return this._data.attributes["tab-index"] ?? ""; }
-	set tabIndex(value) { this._gate.check("dom"); const text = String(value); safeAttribute("tab-index", text); this._data.attributes["tab-index"] = text; emitMutation(this._data, "attribute", { name: "tab-index", value: text }); }
 	get target() { this._gate.check("dom"); return this._data.attributes["target"] ?? ""; }
 	set target(value) { this._gate.check("dom"); const text = String(value); safeAttribute("target", text); this._data.attributes["target"] = text; emitMutation(this._data, "attribute", { name: "target", value: text }); }
 	get translate() { this._gate.check("dom"); return this._data.attributes["translate"] ?? ""; }
@@ -1050,8 +1038,8 @@ class PpermNode {
 	set multiple(value) { this._gate.check("dom"); if (value) this._data.attributes["multiple"] = ""; else delete this._data.attributes["multiple"]; emitMutation(this._data, value ? "attribute" : "removeAttribute", value ? { name: "multiple", value: "" } : { name: "multiple" }); }
 	get required() { this._gate.check("dom"); return Object.hasOwn(this._data.attributes, "required"); }
 	set required(value) { this._gate.check("dom"); if (value) this._data.attributes["required"] = ""; else delete this._data.attributes["required"]; emitMutation(this._data, value ? "attribute" : "removeAttribute", value ? { name: "required", value: "" } : { name: "required" }); }
-	get readOnly() { this._gate.check("dom"); return Object.hasOwn(this._data.attributes, "read-only"); }
-	set readOnly(value) { this._gate.check("dom"); if (value) this._data.attributes["read-only"] = ""; else delete this._data.attributes["read-only"]; emitMutation(this._data, value ? "attribute" : "removeAttribute", value ? { name: "read-only", value: "" } : { name: "read-only" }); }
+	get readOnly() { this._gate.check("dom"); return Object.hasOwn(this._data.attributes, "readonly"); }
+	set readOnly(value) { this._gate.check("dom"); if (value) this._data.attributes["readonly"] = ""; else delete this._data.attributes["readonly"]; emitMutation(this._data, value ? "attribute" : "removeAttribute", value ? { name: "readonly", value: "" } : { name: "readonly" }); }
 	get selected() { this._gate.check("dom"); return Object.hasOwn(this._data.attributes, "selected"); }
 	set selected(value) { this._gate.check("dom"); if (value) this._data.attributes["selected"] = ""; else delete this._data.attributes["selected"]; emitMutation(this._data, value ? "attribute" : "removeAttribute", value ? { name: "selected", value: "" } : { name: "selected" }); }
 	get autofocus() { this._gate.check("dom"); return Object.hasOwn(this._data.attributes, "autofocus"); }
@@ -1066,19 +1054,19 @@ class PpermNode {
 	set open(value) { this._gate.check("dom"); if (value) this._data.attributes["open"] = ""; else delete this._data.attributes["open"]; emitMutation(this._data, value ? "attribute" : "removeAttribute", value ? { name: "open", value: "" } : { name: "open" }); }
 	get reversed() { this._gate.check("dom"); return Object.hasOwn(this._data.attributes, "reversed"); }
 	set reversed(value) { this._gate.check("dom"); if (value) this._data.attributes["reversed"] = ""; else delete this._data.attributes["reversed"]; emitMutation(this._data, value ? "attribute" : "removeAttribute", value ? { name: "reversed", value: "" } : { name: "reversed" }); }
-	get noValidate() { this._gate.check("dom"); return Object.hasOwn(this._data.attributes, "no-validate"); }
-	set noValidate(value) { this._gate.check("dom"); if (value) this._data.attributes["no-validate"] = ""; else delete this._data.attributes["no-validate"]; emitMutation(this._data, value ? "attribute" : "removeAttribute", value ? { name: "no-validate", value: "" } : { name: "no-validate" }); }
-	get playsInline() { this._gate.check("dom"); return Object.hasOwn(this._data.attributes, "plays-inline"); }
-	set playsInline(value) { this._gate.check("dom"); if (value) this._data.attributes["plays-inline"] = ""; else delete this._data.attributes["plays-inline"]; emitMutation(this._data, value ? "attribute" : "removeAttribute", value ? { name: "plays-inline", value: "" } : { name: "plays-inline" }); }
-	get defaultChecked() { this._gate.check("dom"); return Object.hasOwn(this._data.attributes, "default-checked"); }
-	set defaultChecked(value) { this._gate.check("dom"); if (value) this._data.attributes["default-checked"] = ""; else delete this._data.attributes["default-checked"]; emitMutation(this._data, value ? "attribute" : "removeAttribute", value ? { name: "default-checked", value: "" } : { name: "default-checked" }); }
-	get defaultMuted() { this._gate.check("dom"); return Object.hasOwn(this._data.attributes, "default-muted"); }
-	set defaultMuted(value) { this._gate.check("dom"); if (value) this._data.attributes["default-muted"] = ""; else delete this._data.attributes["default-muted"]; emitMutation(this._data, value ? "attribute" : "removeAttribute", value ? { name: "default-muted", value: "" } : { name: "default-muted" }); }
-	get disablePictureInPicture() { this._gate.check("dom"); return Object.hasOwn(this._data.attributes, "disable-picture-in-picture"); }
-	set disablePictureInPicture(value) { this._gate.check("dom"); if (value) this._data.attributes["disable-picture-in-picture"] = ""; else delete this._data.attributes["disable-picture-in-picture"]; emitMutation(this._data, value ? "attribute" : "removeAttribute", value ? { name: "disable-picture-in-picture", value: "" } : { name: "disable-picture-in-picture" }); }
-	get disableRemotePlayback() { this._gate.check("dom"); return Object.hasOwn(this._data.attributes, "disable-remote-playback"); }
-	set disableRemotePlayback(value) { this._gate.check("dom"); if (value) this._data.attributes["disable-remote-playback"] = ""; else delete this._data.attributes["disable-remote-playback"]; emitMutation(this._data, value ? "attribute" : "removeAttribute", value ? { name: "disable-remote-playback", value: "" } : { name: "disable-remote-playback" }); }
-	get tabIndex() { this._gate.check("dom"); return this._data.tabIndex ?? Number(this._data.attributes["tab-index"] ?? 0); }
+	get noValidate() { this._gate.check("dom"); return Object.hasOwn(this._data.attributes, "novalidate"); }
+	set noValidate(value) { this._gate.check("dom"); if (value) this._data.attributes["novalidate"] = ""; else delete this._data.attributes["novalidate"]; emitMutation(this._data, value ? "attribute" : "removeAttribute", value ? { name: "novalidate", value: "" } : { name: "novalidate" }); }
+	get playsInline() { this._gate.check("dom"); return Object.hasOwn(this._data.attributes, "playsinline"); }
+	set playsInline(value) { this._gate.check("dom"); if (value) this._data.attributes["playsinline"] = ""; else delete this._data.attributes["playsinline"]; emitMutation(this._data, value ? "attribute" : "removeAttribute", value ? { name: "playsinline", value: "" } : { name: "playsinline" }); }
+	get defaultChecked() { this._gate.check("dom"); return Object.hasOwn(this._data.attributes, "defaultchecked"); }
+	set defaultChecked(value) { this._gate.check("dom"); if (value) this._data.attributes["defaultchecked"] = ""; else delete this._data.attributes["defaultchecked"]; emitMutation(this._data, value ? "attribute" : "removeAttribute", value ? { name: "defaultchecked", value: "" } : { name: "defaultchecked" }); }
+	get defaultMuted() { this._gate.check("dom"); return Object.hasOwn(this._data.attributes, "defaultmuted"); }
+	set defaultMuted(value) { this._gate.check("dom"); if (value) this._data.attributes["defaultmuted"] = ""; else delete this._data.attributes["defaultmuted"]; emitMutation(this._data, value ? "attribute" : "removeAttribute", value ? { name: "defaultmuted", value: "" } : { name: "defaultmuted" }); }
+	get disablePictureInPicture() { this._gate.check("dom"); return Object.hasOwn(this._data.attributes, "disablepictureinpicture"); }
+	set disablePictureInPicture(value) { this._gate.check("dom"); if (value) this._data.attributes["disablepictureinpicture"] = ""; else delete this._data.attributes["disablepictureinpicture"]; emitMutation(this._data, value ? "attribute" : "removeAttribute", value ? { name: "disablepictureinpicture", value: "" } : { name: "disablepictureinpicture" }); }
+	get disableRemotePlayback() { this._gate.check("dom"); return Object.hasOwn(this._data.attributes, "disableremoteplayback"); }
+	set disableRemotePlayback(value) { this._gate.check("dom"); if (value) this._data.attributes["disableremoteplayback"] = ""; else delete this._data.attributes["disableremoteplayback"]; emitMutation(this._data, value ? "attribute" : "removeAttribute", value ? { name: "disableremoteplayback", value: "" } : { name: "disableremoteplayback" }); }
+	get tabIndex() { this._gate.check("dom"); return this._data.tabIndex ?? Number(this._data.attributes["tabindex"] ?? 0); }
 	set tabIndex(value) { this._gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("tabIndex must be a finite number"); this._data.tabIndex = number; emitMutation(this._data, "property", { property: "tabIndex", value: number }); }
 	get width() { this._gate.check("dom"); return this._data.width ?? Number(this._data.attributes["width"] ?? 0); }
 	set width(value) { this._gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("width must be a finite number"); this._data.width = number; emitMutation(this._data, "property", { property: "width", value: number }); }
@@ -1088,13 +1076,13 @@ class PpermNode {
 	set rows(value) { this._gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("rows must be a finite number"); this._data.rows = number; emitMutation(this._data, "property", { property: "rows", value: number }); }
 	get cols() { this._gate.check("dom"); return this._data.cols ?? Number(this._data.attributes["cols"] ?? 0); }
 	set cols(value) { this._gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("cols must be a finite number"); this._data.cols = number; emitMutation(this._data, "property", { property: "cols", value: number }); }
-	get maxLength() { this._gate.check("dom"); return this._data.maxLength ?? Number(this._data.attributes["max-length"] ?? 0); }
+	get maxLength() { this._gate.check("dom"); return this._data.maxLength ?? Number(this._data.attributes["maxlength"] ?? 0); }
 	set maxLength(value) { this._gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("maxLength must be a finite number"); this._data.maxLength = number; emitMutation(this._data, "property", { property: "maxLength", value: number }); }
-	get minLength() { this._gate.check("dom"); return this._data.minLength ?? Number(this._data.attributes["min-length"] ?? 0); }
+	get minLength() { this._gate.check("dom"); return this._data.minLength ?? Number(this._data.attributes["minlength"] ?? 0); }
 	set minLength(value) { this._gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("minLength must be a finite number"); this._data.minLength = number; emitMutation(this._data, "property", { property: "minLength", value: number }); }
-	get rowSpan() { this._gate.check("dom"); return this._data.rowSpan ?? Number(this._data.attributes["row-span"] ?? 0); }
+	get rowSpan() { this._gate.check("dom"); return this._data.rowSpan ?? Number(this._data.attributes["rowspan"] ?? 0); }
 	set rowSpan(value) { this._gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("rowSpan must be a finite number"); this._data.rowSpan = number; emitMutation(this._data, "property", { property: "rowSpan", value: number }); }
-	get colSpan() { this._gate.check("dom"); return this._data.colSpan ?? Number(this._data.attributes["col-span"] ?? 0); }
+	get colSpan() { this._gate.check("dom"); return this._data.colSpan ?? Number(this._data.attributes["colspan"] ?? 0); }
 	set colSpan(value) { this._gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("colSpan must be a finite number"); this._data.colSpan = number; emitMutation(this._data, "property", { property: "colSpan", value: number }); }
 	get size() { this._gate.check("dom"); return this._data.size ?? Number(this._data.attributes["size"] ?? 0); }
 	set size(value) { this._gate.check("dom"); const number = Number(value); if (!Number.isFinite(number)) throw new TypeError("size must be a finite number"); this._data.size = number; emitMutation(this._data, "property", { property: "size", value: number }); }
