@@ -4,6 +4,8 @@ A small browser JavaScript runner with synchronous DOM access and configurable p
 
 ## Usage
 
+DOM operations are synchronous, so DOM access and mutation do not require await. process.run() is asynchronous because user code may itself use await. To run multiple scripts concurrently, create a separate process for each script and start their run() calls without awaiting one before starting the next:
+
 ~~~js
 import pperm from "./pperm.js";
 
@@ -52,7 +54,6 @@ first.terminate();
 second.terminate();
 ~~~
 
-DOM operations are synchronous, so DOM access and mutation do not require await. process.run() is asynchronous because user code may itself use await. To run multiple scripts concurrently, create a separate process for each script and start their run() calls without awaiting one before starting the next:
 
 ## API
 
