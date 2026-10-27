@@ -1,19 +1,20 @@
 {
 	"name": "pperm.js",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"type": "module",
-	"description": "A browser JavaScript runner using dedicated Workers with a bridged DOM API and configurable capabilities.",
+	"description": "A browser JavaScript process runner with precise capability policies, metered resource quotas, preemptive step budgets, and parallel scheduling inside isolated Workers.",
 	"exports": {
 		".": "./pperm.js"
 	},
 	"files": [
 		"pperm.js",
 		"pperm-worker.js",
+		"pperm-instrument.js",
 		"README.md"
 	],
 	"license": "MIT",
 	"dependencies": {
-		"acorn": "^8.15.0"
+		"acorn": "^8.19.0"
 	},
 	"devDependencies": {
 		"eslint": "^10.13.0"

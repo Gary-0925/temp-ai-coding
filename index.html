@@ -4,10 +4,10 @@
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<meta name="color-scheme" content="dark light">
-		<script type="importmap">
-			{"imports":{"acorn":"https://esm.sh/acorn@8.15.0"}}
-		</script>
 		<title>pperm.js Playground</title>
+		<script type="importmap">
+			{ "imports": { "acorn": "./node_modules/acorn/dist/acorn.mjs" } }
+		</script>
 		<style>
 			:root {
 				font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
@@ -21,7 +21,7 @@
 			}
 
 			body {
-				max-width: 1100px;
+				max-width: 1180px;
 				margin: 0 auto;
 				padding: 40px 24px;
 			}
@@ -43,7 +43,7 @@
 
 			.workspace {
 				display: grid;
-				grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.8fr);
+				grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.85fr);
 				gap: 16px;
 			}
 
@@ -68,7 +68,7 @@
 			textarea {
 				display: block;
 				width: 100%;
-				min-height: 360px;
+				min-height: 380px;
 				resize: vertical;
 				padding: 18px;
 				border: 0;
@@ -83,18 +83,19 @@
 				display: flex;
 				flex-wrap: wrap;
 				align-items: center;
-				gap: 12px;
+				gap: 10px;
 				padding: 14px 16px;
 				border-top: 1px solid #30343d;
 			}
 
 			button {
-				padding: 9px 15px;
+				padding: 9px 13px;
 				border: 1px solid #414653;
 				border-radius: 8px;
 				color: #e5e7eb;
 				background: #272b35;
 				font: inherit;
+				font-size: 13px;
 				cursor: pointer;
 			}
 
@@ -109,65 +110,112 @@
 				cursor: not-allowed;
 			}
 
-			.permissions {
+			.policy {
 				display: grid;
-				gap: 14px;
+				gap: 12px;
 				padding: 16px;
+			}
+
+			.policy fieldset {
+				display: grid;
+				gap: 8px;
+				margin: 0;
+				padding: 10px 12px;
+				border: 1px solid #30343d;
+				border-radius: 8px;
+			}
+
+			.policy legend {
+				padding: 0 6px;
+				font-size: 12px;
+				color: #a5b4fc;
 			}
 
 			label {
 				display: flex;
 				align-items: center;
 				gap: 9px;
-				font-size: 14px;
+				font-size: 13px;
+			}
+
+			input[type="text"], input[type="number"] {
+				width: 100%;
+				padding: 7px 9px;
+				border: 1px solid #3a3f4b;
+				border-radius: 6px;
+				color: #e5e7eb;
+				background: #111318;
+				font: 12px ui-monospace, SFMono-Regular, Consolas, monospace;
+			}
+
+			.grid2 {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 8px;
+			}
+
+			.grid2 span {
+				display: grid;
+				gap: 4px;
+				font-size: 11px;
+				color: #9ca3af;
 			}
 
 			input[type="checkbox"] {
 				accent-color: #818cf8;
-				width: 16px;
-				height: 16px;
+				width: 15px;
+				height: 15px;
 			}
 
 			.hint {
 				margin: 0;
-				font-size: 12px;
+				font-size: 11px;
 			}
 
 			#output {
-				min-height: 180px;
-				max-height: 360px;
+				min-height: 170px;
+				max-height: 320px;
 				overflow: auto;
 				margin: 0;
 				padding: 16px;
 				color: #cbd5e1;
 				white-space: pre-wrap;
 				overflow-wrap: anywhere;
-				font: 13px/1.7 ui-monospace, SFMono-Regular, Consolas, monospace;
+				font: 12px/1.7 ui-monospace, SFMono-Regular, Consolas, monospace;
+			}
+
+			#usage {
+				margin: 0;
+				padding: 12px 16px;
+				min-height: 60px;
+				color: #cbd5e1;
+				white-space: pre-wrap;
+				font: 11px/1.7 ui-monospace, SFMono-Regular, Consolas, monospace;
 			}
 
 			#status {
 				color: #a5b4fc;
 			}
 
-			@media (max-width: 720px) {
-				body {
-					padding: 24px 14px;
-				}
+			.badge {
+				padding: 2px 8px;
+				border-radius: 999px;
+				background: #272b35;
+				color: #a5b4fc;
+				font-size: 11px;
+			}
 
-				.workspace {
-					grid-template-columns: 1fr;
-				}
-
-				textarea {
-					min-height: 280px;
-				}
+			@media (max-width: 860px) {
+				body { padding: 24px 14px; }
+				.workspace { grid-template-columns: 1fr; }
+				textarea { min-height: 280px; }
 			}
 		</style>
 	</head>
 	<body>
 		<header>
 			<h1>pperm.js <span style="color:#818cf8">Playground</span></h1>
-			<p>在独立 Worker 中运行多个 JavaScript 实例；DOM API 保持无 await 的调用形式，每个实例可独立强制终止。</p>
+			<p>精确权限 · 资源配额 · 多进程并行 · 抢占式防阻塞。每个进程跑在不透明源 + CSP 的隔离 Worker 中，全部配额由主线程记账。</p>
 		</header>
 
 		<main class="workspace">
@@ -176,31 +224,41 @@
 					<span>JavaScript</span>
 					<span id="status">就绪</span>
 				</div>
-				<textarea id="editor" spellcheck="false" aria-label="JavaScript 代码编辑器">postMessage("Hello from pperm.js");
-postMessage("DOM permission: " + permissions.dom.enabled);
+				<textarea id="editor" spellcheck="false" aria-label="JavaScript 代码编辑器">postMessage("policy = " + JSON.stringify(policy));
 
-if (!permissions.dom.enabled) {
-	postMessage("请启用 DOM 权限后运行完整示例。");
-	return 42;
+let sum = 0;
+for (let i = 0; i &lt; 200000; i++) sum += i;
+postMessage("循环完成，sum = " + sum);
+
+if (policy.storage.enabled) {
+	await storage.set("answer", { value: 42 });
+	postMessage("storage.get = " + JSON.stringify(await storage.get("answer")));
 }
 
-document.body.textContent = "同步 DOM API 示例";
+if (policy.network.fetch.enabled) {
+	try {
+		const response = await fetch("/pperm.js");
+		postMessage("fetch status = " + response.status);
+	} catch (error) {
+		postMessage("fetch 被拒绝：" + error.message);
+	}
+}
 
-const button = document.createElement("button");
-button.textContent = "点击我";
-button.style.backgroundColor = "#4f46e5";
-button.style.color = "white";
-document.body.appendChild(button);
+if (policy.dom.enabled) {
+	const box = document.createElement("section");
+	box.textContent = "来自隔离进程的 DOM 写入";
+	document.body.appendChild(box);
+	if (policy.dom.innerHTML) {
+		box.innerHTML = "&lt;p&gt;&lt;b&gt;净化&lt;/b&gt;&lt;img src=x onerror=alert(1)&gt;&lt;/p&gt;";
+		postMessage("innerHTML = " + box.innerHTML);
+	}
+}
 
-postMessage("按钮已创建，点击按钮以测试事件监听。");
-await new Promise(resolve => {
-	button.addEventListener("click", event => {
-		postMessage("收到事件：" + event.type);
-		resolve();
-	}, { once: true });
-});</textarea>
+return sum;</textarea>
 				<div class="toolbar">
-					<button class="primary" id="run">启动实例 ▶</button>
+					<button class="primary" id="run">运行进程 ▶</button>
+					<button id="parallel">并行 ×4</button>
+					<button id="stress">死循环压力测试</button>
 					<button id="stop" disabled>停止全部</button>
 					<button id="clear">清空输出</button>
 				</div>
@@ -208,22 +266,46 @@ await new Promise(resolve => {
 
 			<div>
 				<section class="panel" style="margin-bottom:16px">
-					<div class="panel-title">进程权限</div>
-					<div class="permissions">
-						<strong>网络</strong>
-						<label><input id="fetch" type="checkbox"> fetch</label>
-						<label><input id="webSocket" type="checkbox"> WebSocket</label>
-						<label><input id="eventSource" type="checkbox"> EventSource</label>
-						<label><input id="xmlHttpRequest" type="checkbox"> XMLHttpRequest</label>
-						<strong>存储</strong>
-						<label><input id="indexedDB" type="checkbox"> IndexedDB</label>
-						<label><input id="cache" type="checkbox"> Cache API</label>
-						<strong>DOM 桥接</strong>
-						<label><input id="domEnabled" type="checkbox" checked> 允许操作指定元素</label>
-						<label for="domRoot">可操作的根元素选择器</label>
-						<input id="domRoot" value="#dom-target" aria-label="DOM 根元素选择器">
-						<p class="hint">用户脚本在独立 Worker 中执行，主线程不会被脚本的死循环直接占住；超时后可终止该 Worker。默认已启用 DOM 权限并将 #dom-target 作为操作范围。DOM API 不需要 await，但操作通过消息队列应用到主线程，因此读取的是 Worker 内的本地 DOM 镜像；目前选择器仅支持 tag、#id、.class，innerHTML 和复杂选择器不支持。每次点击“启动实例”都会创建独立 Worker，点击“停止全部”终止全部实例。</p>
+					<div class="panel-title"><span>权限与配额</span><span class="badge">宿主侧强制</span></div>
+					<div class="policy">
+						<fieldset>
+							<legend>网络（origin + 路径通配）</legend>
+							<input id="origins" type="text" value="/*" aria-label="允许的网络源">
+							<input id="methods" type="text" value="GET, HEAD" aria-label="允许的 HTTP 方法">
+							<p class="hint">留空则完全禁止 fetch / XHR；以 / 开头表示同源路径。请求由宿主代理发出，Worker 内 connect-src 为 'none'。</p>
+						</fieldset>
+						<fieldset>
+							<legend>DOM</legend>
+							<label><input id="domEnabled" type="checkbox" checked> 启用 DOM 桥</label>
+							<label><input id="innerHTML" type="checkbox"> 允许净化后的 innerHTML</label>
+							<label><input id="storageEnabled" type="checkbox" checked> 允许受控 KV 存储</label>
+							<input id="domRoot" type="text" value="#dom-target" aria-label="DOM 根元素选择器">
+							<input id="allowTags" type="text" value="" placeholder="允许标签（留空 = 默认白名单）" aria-label="允许的标签">
+							<input id="allowEvents" type="text" value="click" placeholder="允许事件（留空 = 全部）" aria-label="允许的事件">
+						</fieldset>
+						<fieldset>
+							<legend>运行时</legend>
+							<label><input id="allowEval" type="checkbox"> 允许动态代码生成</label>
+							<input id="globals" type="text" value="URL, TextEncoder" placeholder="额外全局 API 白名单" aria-label="额外全局 API">
+						</fieldset>
+						<fieldset>
+							<legend>资源配额</legend>
+							<div class="grid2">
+								<span>步数上限<input id="steps" type="number" value="2000000"></span>
+								<span>墙钟上限 ms<input id="wallMs" type="number" value="10000"></span>
+								<span>网络请求数<input id="netRequests" type="number" value="10"></span>
+								<span>存储字节<input id="storageBytes" type="number" value="65536"></span>
+								<span>消息/秒<input id="messagesPerSecond" type="number" value="2000"></span>
+								<span>最大并发<input id="maxConcurrency" type="number" value="4"></span>
+							</div>
+						</fieldset>
+						<p class="hint">步数配额通过 AST 插桩实现：循环与函数入口注入计数点，超限时 Worker 主动上报并立即终止，死循环无法拖住主线程。</p>
 					</div>
+				</section>
+
+				<section class="panel" style="margin-bottom:16px">
+					<div class="panel-title"><span>进程用量</span><span class="badge" id="heartbeat">0</span></div>
+					<pre id="usage">尚无进程。</pre>
 				</section>
 
 				<section class="panel" style="margin-bottom:16px">
@@ -234,103 +316,198 @@ await new Promise(resolve => {
 				</section>
 
 				<section class="panel">
-					<div class="panel-title">
-						<span>输出</span>
-						<span>stdout / result / error</span>
-					</div>
+					<div class="panel-title"><span>输出</span><span>stdout / result / error</span></div>
 					<pre id="output" aria-live="polite">等待运行。</pre>
 				</section>
 			</div>
 		</main>
 
 		<script type="module">
-			import pperm from "./pperm.js?v=20261026-17";
+			import pperm from "./pperm.js?v=20261027-1";
 
-			const editor = document.querySelector("#editor");
-			const output = document.querySelector("#output");
-			const status = document.querySelector("#status");
-			const runButton = document.querySelector("#run");
-			const stopButton = document.querySelector("#stop");
+			const $ = selector => document.querySelector(selector);
+			const editor = $("#editor");
+			const output = $("#output");
+			const usage = $("#usage");
+			const status = $("#status");
+			const stopButton = $("#stop");
 			const processes = new Set();
+			let lastUsage = "";
 
-			function write(value) {
-				output.textContent += String(value) + "\n";
+			function describe(error) {
+				return (error?.name ? error.name + ": " : "") + (error?.message ?? String(error));
+			}
+
+			function value(selector) { return $(selector).value.trim(); }
+			function checked(selector) { return $(selector).checked; }
+			function number(selector, fallback) {
+				const parsed = Number($(selector).value);
+				return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+			}
+			function tokens(selector) {
+				return value(selector).split(/[,\s]+/).filter(Boolean);
+			}
+
+			function write(text) {
+				output.textContent += String(text) + "\n";
+				output.scrollTop = output.scrollHeight;
+			}
+
+			function buildOptions() {
+				const origins = tokens("#origins");
+				const methods = tokens("#methods").map(item => item.toUpperCase());
+				const tags = tokens("#allowTags");
+				const events = tokens("#allowEvents");
+				const globals = tokens("#globals");
+				return {
+					network: {
+						maxRequests: number("#netRequests", 10),
+						fetch: origins.length ? { allow: origins, methods: methods.length ? methods : ["GET"], timeoutMs: 5000, maxResponseBytes: 262144 } : false,
+						xmlHttpRequest: origins.length ? { allow: origins, methods: ["GET"] } : false
+					},
+					storage: {
+						enabled: checked("#storageEnabled"),
+						maxBytes: number("#storageBytes", 65536)
+					},
+					dom: {
+						enabled: checked("#domEnabled"),
+						root: value("#domRoot") || "#dom-target",
+						innerHTML: checked("#innerHTML"),
+						remoteResources: origins.length ? { allow: origins } : false,
+						allowTags: tags.length ? tags : null,
+						allowEvents: events.length ? events : null
+					},
+					runtime: { globals, allowEval: checked("#allowEval") },
+					execution: {
+						steps: number("#steps", 2000000),
+						wallMs: number("#wallMs", 10000)
+					},
+					messages: { perSecond: number("#messagesPerSecond", 2000) },
+					timers: { maxActive: 32, maxCalls: 2000 }
+				};
+			}
+
+			function merge(base, extra) {
+				const result = { ...base };
+				for (const [key, item] of Object.entries(extra)) {
+					result[key] = item && typeof item === "object" && !Array.isArray(item) ? { ...objectAt(base, key), ...item } : item;
+				}
+				return result;
+			}
+
+			function objectAt(target, key) {
+				const value = target[key];
+				return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 			}
 
 			function setRunning() {
 				stopButton.disabled = processes.size === 0;
-				status.textContent = processes.size ? "运行中：" + processes.size + " 个实例" : "就绪";
+				status.textContent = processes.size ? "运行中：" + processes.size + " 个进程" : "就绪";
+				renderUsage();
 			}
 
-			function stopAll() {
-				for (const current of processes) current.terminate();
-				processes.clear();
+			function renderUsage() {
+				if (!processes.size) { usage.textContent = lastUsage || "尚无进程。"; return; }
+				const lines = ["id     状态        步数        消息     耗时ms   网络  存储B"];
+				for (const process of processes) {
+					const u = process.usage;
+					lines.push(
+						String(process.id).padEnd(7) +
+						String(u.state).padEnd(12) +
+						String(u.steps).padEnd(11) +
+						String(u.messages).padEnd(8) +
+						String(Math.round(u.elapsedMs)).padEnd(9) +
+						String(u.netRequests).padEnd(6) +
+						String(u.storageBytes) + (u.instrumented ? "" : "  (未插桩)")
+					);
+				}
+				lastUsage = lines.join("\n");
+				usage.textContent = lastUsage;
+			}
+
+			function register(process, label) {
+				processes.add(process);
+				process.addEventListener("message", event => {
+					if (processes.has(process)) write("[" + label + "] " + event.detail);
+				});
+				process.addEventListener("quota", event => write("[" + label + " 配额] " + event.detail.message));
+				process.addEventListener("error", event => {
+					if (processes.has(process)) write("[" + label + " 错误] " + describe(event.detail));
+				});
+				process.addEventListener("terminate", () => renderUsage());
+				setRunning();
+				return process;
+			}
+
+			function unregister(process) {
+				process.terminate();
+				processes.delete(process);
 				setRunning();
 			}
 
-			runButton.addEventListener("click", async () => {
-				const current = pperm.create({
-					permissions: {
-						network: {
-							fetch: document.querySelector("#fetch").checked,
-							webSocket: document.querySelector("#webSocket").checked,
-							eventSource: document.querySelector("#eventSource").checked,
-							xmlHttpRequest: document.querySelector("#xmlHttpRequest").checked
-						},
-						storage: {
-							indexedDB: document.querySelector("#indexedDB").checked,
-							cache: document.querySelector("#cache").checked
-						},
-						dom: {
-							enabled: document.querySelector("#domEnabled").checked,
-							root: document.querySelector("#domRoot").value.trim() || "#dom-target"
-						}
-					}
-				});
-
-				processes.add(current);
-				setRunning();
-				write("[启动实例] 当前代码已提交执行");
-
-				current.addEventListener("message", event => {
-					if (processes.has(current)) write("[实例消息] " + event.detail);
-				});
-
-				current.addEventListener("error", event => {
-					if (processes.has(current)) write("[实例错误] " + (event.detail?.stack ?? event.detail?.message ?? event.detail));
-				});
-
+			async function runOne(code, label, overrides = {}) {
+				const options = merge(buildOptions(), overrides);
+				const process = pperm.create(options);
+				register(process, label);
 				try {
-					const result = await current.run(editor.value);
-					if (processes.has(current)) write("[实例完成] => " + String(result));
+					const result = await process.run(code);
+					write("[" + label + " 完成] => " + String(result));
 				} catch (error) {
-					if (processes.has(current)) write("[实例失败] " + (error?.stack ?? error?.message ?? error));
+					write("[" + label + " 失败] " + describe(error));
 				} finally {
-					current.terminate();
-					processes.delete(current);
-					setRunning();
+					unregister(process);
+				}
+			}
+
+			$("#run").addEventListener("click", () => runOne(editor.value, "进程"));
+
+			$("#parallel").addEventListener("click", async () => {
+				pperm.host.configure({ maxConcurrency: Math.max(1, number("#maxConcurrency", 4)) });
+				const options = buildOptions();
+				const tasks = Array.from({ length: 4 }, (_, index) => ({
+					code: 'let total = 0; for (let n = 0; n < 300000; n++) total += n; postMessage("进程 ' + index + ' 完成，步数已计量"); return total;',
+					options
+				}));
+				const batch = pperm.all(tasks);
+				for (const [index, process] of batch.processes.entries()) register(process, "并行" + index);
+				write("[并行] 已提交 4 个进程，最大并发 = " + pperm.host.stats.maxConcurrency);
+				try {
+					const results = await batch;
+					write("[并行完成] " + JSON.stringify(results));
+				} catch (error) {
+					write("[并行失败] " + (error?.message ?? error));
+				} finally {
+					for (const process of batch.processes) unregister(process);
 				}
 			});
 
-			stopButton.addEventListener("click", () => {
-				stopAll();
-				write("[全部实例已停止]");
+			$("#stress").addEventListener("click", async () => {
+				write("[压力测试 1/2] 插桩进程：while(true) 应在步数配额处被抢占式终止。");
+				await runOne("while (true) {}", "步数配额", { execution: { steps: 200000, wallMs: 4000 } });
+				write("[压力测试 2/2] 未插桩进程：同样死循环，靠心跳停滞检测兜底，观察主线程心跳继续跳动。");
+				await runOne("while (true) {}", "阻塞兜底", { execution: { steps: Infinity, wallMs: 4000, stalledMs: 900, heartbeatMs: 100 } });
 			});
 
-			document.querySelector("#clear").addEventListener("click", () => {
-				output.textContent = "";
+			$("#stop").addEventListener("click", () => {
+				for (const process of [...processes]) unregister(process);
+				write("[全部进程已停止]");
 			});
+
+			$("#clear").addEventListener("click", () => { output.textContent = ""; });
 
 			editor.addEventListener("keydown", event => {
 				if (event.key === "Tab") {
 					event.preventDefault();
-					const selectionStart = editor.selectionStart;
-					const selectionEnd = editor.selectionEnd;
-					editor.setRangeText("\t", selectionStart, selectionEnd, "end");
+					editor.setRangeText("\t", editor.selectionStart, editor.selectionEnd, "end");
 				}
-
-				if ((event.ctrlKey || event.metaKey) && event.key === "Enter") runButton.click();
+				if ((event.ctrlKey || event.metaKey) && event.key === "Enter") $("#run").click();
 			});
+
+			let ticks = 0;
+			setInterval(() => {
+				$("#heartbeat").textContent = "主线程心跳 " + ++ticks;
+				renderUsage();
+			}, 200);
 		</script>
 	</body>
 </html>
